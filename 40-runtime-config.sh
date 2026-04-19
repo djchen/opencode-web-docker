@@ -91,6 +91,8 @@ cat > /home/sws/public/runtime-config.js <<EOF
     var serverUrl = normalizeUrl(decodeBase64("$OPENCODE_SERVER_URL_B64"))
     if (!serverUrl) return
 
+    window.__OPENCODE_SERVER_URL = serverUrl
+
     var serverName = decodeBase64("$OPENCODE_SERVER_NAME_B64").trim()
     var serverUsername = decodeBase64("$OPENCODE_SERVER_USERNAME_B64").trim()
     var serverPassword = decodeBase64("$OPENCODE_SERVER_PASSWORD_B64")
@@ -122,6 +124,16 @@ cat > /home/sws/public/runtime-config.js <<EOF
         return storedUrl(item) !== serverUrl
       }),
     )
+
+    var currentOrigin = normalizeUrl(location.origin)
+    if (currentOrigin && currentOrigin !== serverUrl) {
+      state.list = state.list.filter(function (item) {
+        return storedUrl(item) !== currentOrigin
+      })
+      if (localStorage.getItem(defaultServerUrlKey) === currentOrigin) {
+        localStorage.setItem(defaultServerUrlKey, serverUrl)
+      }
+    }
 
     localStorage.setItem(serverStoreKey, JSON.stringify(state))
 
