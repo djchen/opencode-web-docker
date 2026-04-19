@@ -1,0 +1,9 @@
+.git
+.env*
+node_modules
+opencode/.git
+opencode/**/node_modules
+opencode/**/dist
+opencode/**/.turbo
+opencode/**/.sst
+opencode/**/.artifacts

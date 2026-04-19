@@ -1,0 +1,70 @@
+name: Update Upstream OpenCode Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Specific upstream opencode release tag to pin.
+        required: false
+        type: string
+  schedule:
+    - cron: "17 0 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-opencode:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve target release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [ -n "$INPUT_RELEASE_TAG" ]; then
+            tag="$INPUT_RELEASE_TAG"
+          else
+            tag="$(gh release view --repo anomalyco/opencode --json tagName --jq .tagName)"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Update submodule to target release
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: ./scripts/update-opencode-release.sh "$RELEASE_TAG"
+
+      - name: Detect submodule changes
+        id: diff
+        run: |
+          if git diff --quiet -- opencode; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: automation/update-opencode-${{ steps.release.outputs.tag }}
+          delete-branch: true
+          commit-message: "chore: update opencode to ${{ steps.release.outputs.tag }}"
+          title: "chore: update opencode to ${{ steps.release.outputs.tag }}"
+          body: |
+            ## Summary
+            - update the `opencode/` submodule to `${{ steps.release.outputs.tag }}`
+            - keep OpenCode Web Docker aligned with the latest upstream OpenCode release
+            - let the normal Docker workflow rebuild and publish the refreshed GHCR image after merge

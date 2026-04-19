@@ -1,0 +1,9 @@
+services:
+  web:
+    image: ghcr.io/djchen/opencode-web-docker
+    ports:
+      - 8080:80
+    environment:
+      OPENCODE_SERVER_URL: http://opencode-api.example.com:4096
+      OPENCODE_SERVER_NAME: OpenCode Web
+      OPENCODE_FORCE_DEFAULT_SERVER: true
