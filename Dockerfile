@@ -37,10 +37,10 @@ LABEL org.opencontainers.image.revision="$REVISION"
 LABEL org.opencontainers.image.licenses="MIT"
 
 COPY --chown=sws:sws sws.toml /home/sws/sws.toml
-COPY --chown=sws:sws 40-runtime-config.sh /usr/local/bin/40-runtime-config.sh
+COPY --chown=sws:sws runtime-config.sh /usr/local/bin/runtime-config.sh
 COPY --chown=sws:sws --from=build /tmp/site/ /home/sws/public/
 
-RUN chmod +x /usr/local/bin/40-runtime-config.sh
+RUN chmod +x /usr/local/bin/runtime-config.sh
 
-ENTRYPOINT ["/bin/sh", "/usr/local/bin/40-runtime-config.sh"]
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/runtime-config.sh"]
 CMD ["static-web-server", "-w", "/home/sws/sws.toml"]
