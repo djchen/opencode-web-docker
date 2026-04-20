@@ -4,7 +4,7 @@
 - `opencode/` is a git submodule pointing at `https://github.com/anomalyco/opencode.git`.
 - Do not modify files under `opencode/`. Treat upstream code as read-only; the only upstream change allowed here is updating the submodule pointer.
 - Root changes belong in the repo root or `scripts/`.
-- Read the closest `AGENTS.md` inside the submodule for upstream behavior context (`opencode/AGENTS.md`, `opencode/packages/app/AGENTS.md`, etc.).
+- When inspecting upstream code for context, read the closest `AGENTS.md` inside `opencode/` (`opencode/AGENTS.md`, `opencode/packages/app/AGENTS.md`, etc.).
 
 **Commands**
 
@@ -38,3 +38,10 @@
 - Upstream typecheck: `cd opencode && bun typecheck`
 - Do not run `cd opencode && bun test`; it intentionally exits with "do not run tests from root". Use focused tests from package dirs (`cd opencode/packages/opencode && bun test`, `cd opencode/packages/app && bun test:unit`, etc.).
 - For local browser UI work, run the backend from `opencode/packages/opencode` with `bun run --conditions=browser ./src/index.ts serve --port 4096`, run the app from `opencode/packages/app` with `bun dev -- --port 4444`, and use `http://localhost:4444`.
+
+**Local Docker Cleanup**
+
+- Local development and image verification leaves Docker artifacts. Clean up:
+- Remove the project image: `docker rmi opencode-web-docker`
+- Remove dangling images, stopped containers, and build cache: `docker system prune`
+- Remove build cache: `docker builder prune`
