@@ -20,7 +20,7 @@ More Info: https://opencode.ai/docs/server/
 ```yaml
 services:
   web:
-    image: ghcr.io/djchen/opencode-web-docker:main
+    image: ghcr.io/djchen/opencode-web-docker:latest
     ports:
       - 8080:80
     environment:
@@ -40,7 +40,7 @@ docker run -d \
   -p 8080:80 \
   -e OPENCODE_SERVER_URL=http://opencode-api.example.com:4096 \
   -e OPENCODE_FORCE_DEFAULT_SERVER=true \
-  ghcr.io/djchen/opencode-web-docker:main
+  ghcr.io/djchen/opencode-web-docker:latest
 ```
 
 ## Configuration
