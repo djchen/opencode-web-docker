@@ -25,7 +25,7 @@ cat > /home/sws/public/runtime-config.js <<EOF
     console.warn(
       "OpenCode runtime-config may be incompatible with this upstream build:",
       reason,
-      "Review 40-runtime-config.sh against upstream app persistence.",
+      "Review runtime-config.sh against upstream app persistence.",
     )
   }
 

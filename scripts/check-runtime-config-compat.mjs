@@ -75,7 +75,7 @@ if (failures.length) {
     [
       "OpenCode runtime-config compatibility check failed.",
       ...failures,
-      "Review 40-runtime-config.sh before building a new image against this upstream revision.",
+      "Review runtime-config.sh before building a new image against this upstream revision.",
     ].join("\n"),
   )
 }
