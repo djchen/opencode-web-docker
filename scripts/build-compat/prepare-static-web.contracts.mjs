@@ -1,7 +1,8 @@
+import { entrySourcePath } from "./runtime-config.contracts.mjs"
 import { every, match } from "./core.mjs"
 
 export const prepareStaticWebSources = {
-  entry: "opencode/packages/app/src/entry.tsx",
+  entry: entrySourcePath,
   layout: "opencode/packages/app/src/pages/layout.tsx",
   sidebarShell: "opencode/packages/app/src/pages/layout/sidebar-shell.tsx",
   statusPopover: "opencode/packages/app/src/components/status-popover.tsx",
@@ -121,9 +122,9 @@ export const prepareStaticWebContracts = [
           /class="pointer-events-none absolute inset-x-0 bottom-0"/,
           /data-action="prompt-submit"/,
           /data-action="prompt-attach"/,
-          /data-action": "prompt-agent"/,
-          /data-action="prompt-model"/,
-          /data-action": "prompt-model-variant"/,
+          /(?:data-action="prompt-agent"|"data-action": "prompt-agent")/,
+          /(?:data-action="prompt-model"|"data-action": "prompt-model")/,
+          /(?:data-action="prompt-model-variant"|"data-action": "prompt-model-variant")/,
           /h-7/,
           /text-13-medium/,
           /text-13-regular/,

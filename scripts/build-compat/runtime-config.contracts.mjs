@@ -1,7 +1,9 @@
 import { every, match } from "./core.mjs"
 
+export const entrySourcePath = "opencode/packages/app/src/entry.tsx"
+
 export const runtimeConfigSources = {
-  entry: "opencode/packages/app/src/entry.tsx",
+  entry: entrySourcePath,
   persist: "opencode/packages/app/src/utils/persist.ts",
   server: "opencode/packages/app/src/context/server.tsx",
 }
