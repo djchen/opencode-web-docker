@@ -16,6 +16,8 @@ WORKDIR /app
 
 COPY opencode ./opencode
 COPY scripts/check-runtime-config-compat.mjs ./scripts/check-runtime-config-compat.mjs
+COPY scripts/build-compat ./scripts/build-compat
+COPY scripts/customization-css.mjs ./scripts/customization-css.mjs
 COPY scripts/prepare-static-web.mjs ./scripts/prepare-static-web.mjs
 
 RUN bun install --cwd opencode --frozen-lockfile
