@@ -17,16 +17,7 @@ More Info: https://opencode.ai/docs/server/
 
 ### Docker Compose
 
-```yaml
-services:
-  web:
-    image: ghcr.io/djchen/opencode-web-docker:latest
-    ports:
-      - 8080:80
-    environment:
-      OPENCODE_SERVER_URL: http://opencode-api.example.com:4096
-      OPENCODE_FORCE_DEFAULT_SERVER: true
-```
+See [`docker-compose.yaml`](./docker-compose.yaml) for a ready-to-run compose example.
 
 ```sh
 docker compose up -d
@@ -38,8 +29,11 @@ docker compose up -d
 docker run -d \
   --name opencode-web \
   -p 8080:80 \
-  -e OPENCODE_SERVER_URL=http://opencode-api.example.com:4096 \
-  -e OPENCODE_FORCE_DEFAULT_SERVER=true \
+  -e OPENCODE_SERVER_1_URL=https://opencode-api1.example.com \
+  -e OPENCODE_SERVER_1_NAME='Server 1' \
+  -e OPENCODE_SERVER_2_URL=https://opencode-api2.example.com \
+  -e OPENCODE_SERVER_2_NAME='Server 2' \
+  -e OPENCODE_FORCE_DEFAULT_SERVER=1 \
   ghcr.io/djchen/opencode-web-docker:latest
 ```
 
@@ -49,13 +43,34 @@ All configuration is via environment variables, applied at container start.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENCODE_SERVER_URL` | **yes** | — | URL of the `opencode serve` backend (e.g. `http://host:4096`) |
-| `OPENCODE_SERVER_NAME` | no | — | Display name shown for the server in the UI |
-| `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | Always select the configured server as the default on load |
-| `OPENCODE_SERVER_USERNAME` | no | — | HTTP basic-auth username. **Warning:** stored in browser localStorage — do not set for public deployments |
-| `OPENCODE_SERVER_PASSWORD` | no | — | HTTP basic-auth password. **Warning:** stored in browser localStorage — do not set for public deployments |
+| `OPENCODE_SERVER_1_URL` | **yes** | — | First configured backend URL |
+| `OPENCODE_SERVER_<N>_URL` | yes, for every configured index | — | Backend URL for server `N` |
+| `OPENCODE_SERVER_<N>_NAME` | no | — | Display name shown for server `N` in the UI |
+| `OPENCODE_SERVER_<N>_USERNAME` | no | — | HTTP basic-auth username for server `N`. Stored in browser localStorage |
+| `OPENCODE_SERVER_<N>_PASSWORD` | no | — | HTTP basic-auth password for server `N`. Stored in browser localStorage |
+| `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | `true` or unset forces server `1`; `false` preserves a valid browser default; integer `N` forces server `N` |
 
-**IMPORTANT**: `OPENCODE_SERVER_USERNAME` and `OPENCODE_SERVER_PASSWORD` are written into browser localStorage at runtime. **Do not set these for public deployments.** Let users enter credentials in the app instead.
+Rules:
+
+- Indexed env vars are required. Legacy unsuffixed vars such as `OPENCODE_SERVER_URL` are a breaking change and now fail container startup with a migration error.
+- Configured indexes must be contiguous unpadded integers starting at `1`. Valid examples: `1`; `1,2`; `1,2,3`. Invalid examples: `01`; `1,3`.
+- URLs are normalized by trimming whitespace, adding `http://` when missing, and removing trailing slashes.
+- `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`. Legacy truthy aliases such as `yes` and `on` are not supported.
+- Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, legacy vars, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
+
+Example:
+
+```yaml
+OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
+OPENCODE_SERVER_1_NAME: Server 1
+
+OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
+OPENCODE_SERVER_2_NAME: Server 2
+
+OPENCODE_FORCE_DEFAULT_SERVER: 1
+```
+
+**IMPORTANT**: `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written into browser localStorage at runtime. **Do not set these for public deployments.** Let users enter credentials in the app instead.
 
 
 ## How It Works
@@ -64,8 +79,15 @@ All configuration is via environment variables, applied at container start.
    - `scripts/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle) and patches the app's default server URL logic to respect the runtime config.
    - `scripts/prepare-static-web.mjs` injects CSS that hides the Help button (links to OpenCode Discord) from the sidebar rail.
    - `scripts/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by the build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected scripts.
-2. **Run time** — `runtime-config.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes the configured server, display name, and credentials into browser localStorage before the app loads.
+2. **Run time** — `runtime-config.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, and removes `location.origin` when it would otherwise appear as a fake backend.
 3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config.
+
+Default server behavior:
+
+- If `OPENCODE_FORCE_DEFAULT_SERVER` is unset or `true`, server `1` is selected on load.
+- If `OPENCODE_FORCE_DEFAULT_SERVER` is an integer `N`, server `N` is selected on load.
+- If `OPENCODE_FORCE_DEFAULT_SERVER=false`, the browser's existing default is preserved when it still points to a server in the merged list; otherwise the wrapper falls back to server `1`.
+- For configured servers already stored in the browser, non-empty env-provided `NAME`, `USERNAME`, and `PASSWORD` override stored values. Unset and empty values are treated the same, so stored optional metadata is preserved when the env omits a value or sets it to an empty string.
 
 ## Updating Upstream OpenCode
 
