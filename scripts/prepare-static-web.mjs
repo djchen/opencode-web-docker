@@ -1,5 +1,6 @@
 import { cp, readFile, readdir, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { customizationCss } from "./customization-css.mjs"
 
 const [source, target] = process.argv.slice(2)
 
@@ -8,13 +9,7 @@ if (!source || !target) {
 }
 
 const runtimeTag = '    <script src="/runtime-config.js"></script>\n'
-const customizationTag = [
-  '    <style id="opencode-web-customizations">',
-  '      [data-component="sidebar-rail"] [data-component="tooltip-trigger"]:has(> [data-component="icon-button"][data-icon="help"]) { display: none !important; }',
-  '      [data-component="sidebar-rail"] [data-component="icon-button"][data-icon="help"] { display: none !important; pointer-events: none !important; }',
-  '    </style>',
-  "",
-].join("\n")
+const customizationTag = `    <style id="opencode-web-customizations">\n${customizationCss}\n    </style>\n`
 const htmlPath = path.join(target, "index.html")
 
 await cp(source, target, { recursive: true, force: true })

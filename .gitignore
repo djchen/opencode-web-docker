@@ -8,3 +8,4 @@ tmp
 .direnv/
 opencode/node_modules/
 opencode/.turbo/
+.playwright-cli/

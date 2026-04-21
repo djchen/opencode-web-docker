@@ -75,10 +75,9 @@ OPENCODE_FORCE_DEFAULT_SERVER: 1
 
 ## How It Works
 
-1. **Build time** — The upstream OpenCode web app is built and two small patches are applied:
-   - `scripts/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle) and patches the app's default server URL logic to respect the runtime config.
-   - `scripts/prepare-static-web.mjs` injects CSS that hides the Help button (links to OpenCode Discord) from the sidebar rail.
-   - `scripts/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by the build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected scripts.
+1. **Build time** — The upstream OpenCode web app is built, then:
+   - `scripts/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, and injects the customization CSS from `scripts/customization-css.mjs`.
+   - `scripts/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected scripts.
 2. **Run time** — `runtime-config.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, and removes `location.origin` when it would otherwise appear as a fake backend.
 3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config.
 
