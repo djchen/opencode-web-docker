@@ -17,19 +17,7 @@ More Info: https://opencode.ai/docs/server/
 
 ### Docker Compose
 
-```yaml
-services:
-  web:
-    image: ghcr.io/djchen/opencode-web-docker:latest
-    ports:
-      - 8080:80
-    environment:
-      OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
-      OPENCODE_SERVER_1_NAME: Server 1
-      OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
-      OPENCODE_SERVER_2_NAME: Server 2
-      OPENCODE_FORCE_DEFAULT_SERVER: 1
-```
+See [`docker-compose.yaml`](./docker-compose.yaml) for a ready-to-run compose example.
 
 ```sh
 docker compose up -d
