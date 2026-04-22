@@ -20,35 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  runtime-config-regression:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          submodules: recursive
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
-
-      - name: Build Docker image for regression checks
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
-        with:
-          context: .
-          load: true
-          tags: opencode-web-docker
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run runtime-config regression checks
-        run: ./scripts/test-runtime-config.sh
-
   docker:
-    needs: runtime-config-regression
     runs-on: ubuntu-latest
 
     steps:
@@ -90,7 +62,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}

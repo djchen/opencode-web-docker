@@ -101,6 +101,16 @@ expect_failure \
     "$image_tag" \
     true
 
+multiline_env_value="$(printf 'before\nOPENCODE_SERVER_9_URL\nafter')"
+
+expect_success \
+  "ignore multiline env values while scanning backend vars" \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=http://api1.example.com \
+    -e "UNRELATED_MULTILINE=$multiline_env_value" \
+    "$image_tag" \
+    sh -lc 'test -s /home/sws/public/runtime-config.js'
+
 expect_success \
   "generate a valid multi-backend runtime payload" \
   docker run --rm \
