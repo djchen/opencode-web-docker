@@ -13,6 +13,38 @@ permissions:
   contents: read
 
 jobs:
+  runtime-config-regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: recursive
+
+      - name: Build Docker image for regression checks
+        run: docker build -t opencode-web-docker .
+
+      - name: Run runtime-config regression checks
+        run: ./scripts/test-runtime-config.sh
+
+  build-compat-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Bun
+        run: curl -fsSL https://bun.sh/install | bash -s -- bun-v1.3.12
+
+      - name: Add Bun to PATH
+        run: echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Run build-compat unit tests
+        run: bun test scripts/build-compat
+
   actionlint:
     runs-on: ubuntu-latest
 

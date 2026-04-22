@@ -28,6 +28,11 @@ export const prepareStaticWebContracts = [
       ),
       match(
         "entry",
+        /return "http:\/\/localhost:4096"/,
+        'expected app getCurrentUrl to keep returning the localhost bootstrap URL literal (used by prepare-static-web.mjs JS patch)',
+      ),
+      match(
+        "entry",
         /return (?:window\.)?location\.origin/,
         "expected app getCurrentUrl to keep returning location.origin as fallback (used by prepare-static-web.mjs JS patch)",
       ),
@@ -83,8 +88,8 @@ export const prepareStaticWebContracts = [
       ),
       every(
         "tabs",
-        [/data-slot="tabs-list"/, /data-slot="tabs-trigger"/],
-        'expected Tabs to keep exposing data-slot="tabs-list" and data-slot="tabs-trigger" (used by prepare-static-web.mjs mobile header CSS)',
+        [/data-slot="tabs-list"/, /data-slot="tabs-trigger-wrapper"/, /data-slot="tabs-trigger"/],
+        'expected Tabs to keep exposing data-slot="tabs-list", data-slot="tabs-trigger-wrapper", and data-slot="tabs-trigger" (used by prepare-static-web.mjs mobile header CSS)',
       ),
     ],
   },
@@ -100,6 +105,11 @@ export const prepareStaticWebContracts = [
         "popover",
         /data-component="popover-content"/,
         'expected Popover to keep exposing data-component="popover-content" (used by prepare-static-web.mjs mobile popover CSS)',
+      ),
+      match(
+        "popover",
+        /data-slot="popover-body"/,
+        'expected Popover to keep exposing data-slot="popover-body" (used by prepare-static-web.mjs mobile popover CSS)',
       ),
       match(
         "statusPopoverBody",
@@ -135,6 +145,16 @@ export const prepareStaticWebContracts = [
         "dockSurface",
         [/data-dock-surface="tray"/, /data-dock-attach=\{split\.attach \|\| "none"\}/],
         'expected DockTray to keep data-dock-surface="tray" and data-dock-attach markers (used by prepare-static-web.mjs footer CSS)',
+      ),
+      every(
+        "messageTimeline",
+        [
+          /data-session-title/,
+          /class="h-12 w-full flex items-center justify-between gap-2"/,
+          /class="flex items-center gap-1 min-w-0 flex-1 pr-3"/,
+          /class="shrink-0 flex items-center gap-3"/,
+        ],
+        "expected session title markup to keep the direct child layout used by prepare-static-web.mjs mobile header CSS",
       ),
     ],
   },

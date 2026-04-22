@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
 FROM oven/bun:1.3.12 AS build
 
@@ -14,13 +14,22 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Keep install inputs stable across ordinary source edits so bun install stays cached.
+COPY opencode/package.json opencode/bun.lock opencode/bunfig.toml ./opencode/
+COPY opencode/patches ./opencode/patches
+COPY opencode/.husky ./opencode/.husky
+COPY --parents \
+  opencode/./packages/**/package.json \
+  ./opencode/
+COPY opencode/packages/opencode/script/fix-node-pty.ts ./opencode/packages/opencode/script/fix-node-pty.ts
+
+RUN bun install --cwd opencode --frozen-lockfile
+
 COPY opencode ./opencode
 COPY scripts/check-runtime-config-compat.mjs ./scripts/check-runtime-config-compat.mjs
 COPY scripts/build-compat ./scripts/build-compat
 COPY scripts/customization-css.mjs ./scripts/customization-css.mjs
 COPY scripts/prepare-static-web.mjs ./scripts/prepare-static-web.mjs
-
-RUN bun install --cwd opencode --frozen-lockfile
 RUN bun ./scripts/check-runtime-config-compat.mjs
 RUN bun run --cwd opencode/packages/app build
 RUN bun ./scripts/prepare-static-web.mjs ./opencode/packages/app/dist /tmp/site
@@ -40,9 +49,13 @@ LABEL org.opencontainers.image.licenses="MIT"
 
 COPY --chown=sws:sws sws.toml /home/sws/sws.toml
 COPY --chown=sws:sws runtime-config.sh /usr/local/bin/runtime-config.sh
+COPY --chown=sws:sws scripts/runtime-config-core.js /usr/local/share/opencode-web/runtime-config-core.js
 COPY --chown=sws:sws --from=build /tmp/site/ /home/sws/public/
 
 RUN chmod +x /usr/local/bin/runtime-config.sh
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q --spider http://127.0.0.1/index.html || exit 1
 
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/runtime-config.sh"]
 CMD ["static-web-server", "-w", "/home/sws/sws.toml"]
