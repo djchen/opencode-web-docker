@@ -38,15 +38,10 @@ encode_base64() {
 }
 
 runtime_config_core_path="/usr/local/share/opencode-web/runtime-config-core.js"
+runtime_config_path="/home/sws/public/runtime-config.js"
 if [ ! -r "$runtime_config_core_path" ]; then
   die "Missing runtime-config core JS at $runtime_config_core_path"
 fi
-
-for legacy_var in OPENCODE_SERVER_URL OPENCODE_SERVER_NAME OPENCODE_SERVER_USERNAME OPENCODE_SERVER_PASSWORD; do
-  if has_env "$legacy_var"; then
-    die "Unsupported legacy variable $legacy_var detected. Migrate to indexed variables such as OPENCODE_SERVER_1_URL."
-  fi
-done
 
 raw_indexes=""
 # Read null-delimited env entries so multiline values cannot inject bogus names.
@@ -101,7 +96,7 @@ done
 if has_env OPENCODE_FORCE_DEFAULT_SERVER; then
   force_default_raw="$(get_env OPENCODE_FORCE_DEFAULT_SERVER)"
 else
-force_default_raw="true"
+  force_default_raw="true"
 fi
 force_mode="force"
 default_server_index="1"
@@ -129,8 +124,6 @@ case "$force_default_raw" in
     default_server_index="$force_default_raw"
     ;;
 esac
-
-runtime_config_path="/home/sws/public/runtime-config.js"
 
 cat > "$runtime_config_path" <<EOF
 ;(function () {

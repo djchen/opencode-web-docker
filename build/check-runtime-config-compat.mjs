@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { contracts, failureHints, sources } from "./build-compat/index.mjs"
-import { formatFailures, loadSources, runContracts, validateContracts } from "./build-compat/core.mjs"
+import { contracts, failureHints, sources } from "./tests/index.mjs"
+import { formatFailures, loadSources, runContracts, validateContracts } from "./tests/core.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 validateContracts(sources, contracts)

@@ -52,11 +52,10 @@ All configuration is via environment variables, applied at container start.
 
 Rules:
 
-- Indexed env vars are required. Legacy unsuffixed vars such as `OPENCODE_SERVER_URL` are a breaking change and now fail container startup with a migration error.
 - Configured indexes must be contiguous unpadded integers starting at `1`. Valid examples: `1`; `1,2`; `1,2,3`. Invalid examples: `01`; `1,3`.
 - URLs are normalized by trimming whitespace, adding `http://` when missing, and removing trailing slashes.
-- `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`. Legacy truthy aliases such as `yes` and `on` are not supported.
-- Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, legacy vars, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
+- `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`.
+- Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
 
 Example:
 
@@ -76,10 +75,10 @@ OPENCODE_FORCE_DEFAULT_SERVER: 1
 ## How It Works
 
 1. **Build time** — The upstream OpenCode web app is built, then:
-   - `scripts/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, and injects the customization CSS from `scripts/customization-css.mjs`.
-   - `scripts/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected scripts.
-2. **Run time** — `runtime-config.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, and removes `location.origin` when it would otherwise appear as a fake backend.
-3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config.
+   - `build/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, injects the customization CSS from `build/customization-css.mjs`, and patches only the JS assets referenced from `index.html` in place.
+   - `build/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected build or runtime scripts.
+2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, avoids redundant localStorage rewrites when nothing changed, and removes `location.origin` when it would otherwise appear as a fake backend.
+3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config.
 
 Default server behavior:
 
@@ -100,7 +99,13 @@ Default server behavior:
 
 Then rebuild the image (`docker build -t opencode-web-docker .`).
 
-If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update the affected scripts before rebuilding.
+If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update `runtime/entrypoint.sh`, `runtime/runtime-config-core.js`, or the other affected build scripts before rebuilding.
+
+Repository-owned verification:
+
+- `docker build -t opencode-web-docker .`
+- `bun test tests`
+- `./scripts/test-runtime-config.sh --build`
 
 ## Building from Source
 

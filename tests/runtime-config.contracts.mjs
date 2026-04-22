@@ -42,4 +42,4 @@ export const runtimeConfigContracts = [
 ]
 
 export const runtimeConfigFailureHint =
-  "Review runtime-config.sh before building a new image against this upstream revision."
+  "Review runtime/entrypoint.sh and runtime/runtime-config-core.js before building a new image against this upstream revision."

@@ -13,7 +13,7 @@
     "url": "https://github.com/djchen/opencode-web-docker/issues"
   },
   "scripts": {
-    "test:build-compat": "bun test scripts/build-compat",
+    "test:build-compat": "bun test tests",
     "docker:build": "docker build -t opencode-web-docker .",
     "upstream:update": "./scripts/update-opencode-release.sh"
   }
