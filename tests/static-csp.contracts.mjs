@@ -2,6 +2,7 @@ const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/
 const staticWebCspPattern = /Content-Security-Policy\s*=\s*"([^"]+)"/
 
 const connectSrcAdditions = ["http:", "https:", "ws:", "wss:"]
+const scriptSrcAdditions = ["'unsafe-inline'"]
 const extraDirectives = {
   "base-uri": ["'self'"],
   "frame-ancestors": ["'none'"],
@@ -46,6 +47,7 @@ export function buildExpectedStaticWebCsp(upstreamDefaultCsp) {
   const upstream = parseCsp(upstreamDefaultCsp)
   const expected = new Map(upstream.entries())
 
+  expected.set("script-src", mergeValues(expected.get("script-src") ?? [], scriptSrcAdditions))
   expected.set("connect-src", mergeValues(expected.get("connect-src") ?? [], connectSrcAdditions))
 
   for (const [name, values] of Object.entries(extraDirectives)) {
