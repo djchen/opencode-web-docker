@@ -66,6 +66,15 @@ expect_success() {
   "$@"
 }
 
+expect_generated_runtime_config_parses() {
+  name="$1"
+  shift
+
+  printf '==> %s\n' "$name"
+  runtime_config_js="$("$@")"
+  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function(source)});'
+}
+
 expect_failure \
   "reject malformed indexed env names" \
   "Configured backend variable names must use unpadded integer indexes starting at 1. Invalid variable: OPENCODE_SERVER_1FOO_URL." \
@@ -134,7 +143,19 @@ expect_success \
     -e OPENCODE_SERVER_1_NAME=Server\ 1 \
     -e OPENCODE_SERVER_2_URL=https://api2.example.com/ \
     -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
+    -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /home/sws/public/runtime-config.js && grep -F "var configuredDefaultIndex = 2" /home/sws/public/runtime-config.js >/dev/null && grep -F "var forceDefaultMode = \"force\"" /home/sws/public/runtime-config.js >/dev/null && grep -F "window.__OPENCODE_SERVER_URL = bootstrapUrl" /home/sws/public/runtime-config.js >/dev/null && grep -F "var bootstrapUrl = mergedConfigured[0].http.url" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "window.__OPENCODE_SERVER_URL = effectiveDefaultUrl" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "index:" /home/sws/public/runtime-config.js >/dev/null'
+    sh -lc 'test -s /home/sws/public/runtime-config.js && test -s /home/sws/public/opencode-web-customizations.css && grep -F "var configuredDefaultIndex = 2" /home/sws/public/runtime-config.js >/dev/null && grep -F "var forceDefaultMode = \"force\"" /home/sws/public/runtime-config.js >/dev/null && grep -F "window.__OPENCODE_SERVER_URL = bootstrapUrl" /home/sws/public/runtime-config.js >/dev/null && grep -F "var bootstrapUrl = mergedConfigured[0].http.url" /home/sws/public/runtime-config.js >/dev/null && grep -F "var appTitle = \"SG9zdGVkIE9wZW5Db2Rl\"" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "window.__OPENCODE_SERVER_URL = effectiveDefaultUrl" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "index:" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "<style id=\"opencode-web-customizations\"" /home/sws/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /home/sws/public/index.html >/dev/null'
+
+expect_generated_runtime_config_parses \
+  "generated runtime-config.js parses as JavaScript" \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=api1.example.com \
+    -e OPENCODE_SERVER_1_NAME=Server\ 1 \
+    -e OPENCODE_SERVER_2_URL=https://api2.example.com/ \
+    -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
+    -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
+    "$image_tag" \
+    sh -lc 'test -s /home/sws/public/runtime-config.js && cat /home/sws/public/runtime-config.js'
 
 printf '==> All runtime-config regression checks passed\n'

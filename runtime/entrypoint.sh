@@ -100,6 +100,7 @@ else
 fi
 force_mode="force"
 default_server_index="1"
+app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
 
 case "$force_default_raw" in
   true)
@@ -131,6 +132,7 @@ cat > "$runtime_config_path" <<EOF
   var serverStoreKey = "opencode.global.dat:server"
   var forceDefaultMode = "${force_mode}"
   var configuredDefaultIndex = ${default_server_index}
+  var appTitle = "${app_title_b64}"
   var configuredServers = [
 EOF
 
@@ -149,6 +151,8 @@ while [ "$index" -le "$max_index" ]; do
     "$url_b64" "$name_b64" "$username_b64" "$password_b64" "$separator" >> "$runtime_config_path"
   index=$((index + 1))
 done
+
+printf '  ]\n' >> "$runtime_config_path"
 
 cat "$runtime_config_core_path" >> "$runtime_config_path"
 

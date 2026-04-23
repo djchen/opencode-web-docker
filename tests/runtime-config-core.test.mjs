@@ -18,6 +18,7 @@ function runRuntimeConfig(input) {
     '  var serverStoreKey = "opencode.global.dat:server"',
     `  var forceDefaultMode = ${JSON.stringify(input.forceDefaultMode ?? "force")}`,
     `  var configuredDefaultIndex = ${input.configuredDefaultIndex ?? 1}`,
+    `  var appTitle = ${JSON.stringify(input.appTitle ?? "")}`,
     `  var configuredServers = ${JSON.stringify(input.configuredServers ?? [], null, 2).replace(/^/gm, "  ")}`,
     runtimeConfigCore,
   ].join("\n")
@@ -29,6 +30,7 @@ function runRuntimeConfig(input) {
     Uint8Array,
     atob: (value) => Buffer.from(value, "base64").toString("binary"),
     console: { warn: (...args) => warnings.push(args) },
+    document: { title: input.documentTitle ?? "OpenCode" },
     location: { origin: input.locationOrigin ?? "http://frontend.example.com" },
     localStorage: {
       getItem: (key) => (storage.has(key) ? storage.get(key) : null),
@@ -47,6 +49,7 @@ function runRuntimeConfig(input) {
     setCalls,
     storage,
     warnings,
+    document: context.document,
     window: context.window,
   }
 }
@@ -215,5 +218,25 @@ describe("runtime-config core", () => {
     expect(saved.projects).toEqual({})
     expect(saved.lastProject).toEqual({})
     expect(result.warnings.length).toBeGreaterThan(0)
+  })
+
+  test("sets document.title when appTitle is configured", () => {
+    const result = runRuntimeConfig({
+      configuredServers: [
+        {
+          url: encodeBase64("http://api1.example.com"),
+          name: encodeBase64("Server 1"),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      storage: {
+        "opencode.global.dat:server": JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+      documentTitle: "OpenCode",
+      appTitle: encodeBase64("My Hosted OpenCode"),
+    })
+
+    expect(result.document.title).toBe("My Hosted OpenCode")
   })
 })

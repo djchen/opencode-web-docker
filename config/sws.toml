@@ -16,4 +16,4 @@ source = "/index.html"
 
 [advanced.headers.headers]
 Cache-Control = "no-store, no-cache, must-revalidate"
-Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: blob: http: https:; media-src 'self' data: blob: http: https:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
+Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: blob: http: https:; media-src 'self' data: blob: http: https:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self'; worker-src 'self' blob:"
