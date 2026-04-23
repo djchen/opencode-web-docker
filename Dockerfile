@@ -26,6 +26,7 @@ COPY opencode/packages/opencode/script/fix-node-pty.ts ./opencode/packages/openc
 RUN bun install --cwd opencode --frozen-lockfile
 
 COPY opencode ./opencode
+COPY config ./config
 COPY build/check-runtime-config-compat.mjs ./build/check-runtime-config-compat.mjs
 COPY tests ./tests
 COPY build/customization-css.mjs ./build/customization-css.mjs
