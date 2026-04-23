@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { injectHtml, patchBuiltJs, prepareStaticWeb } from "../prepare-static-web.mjs"
+import { getReferencedJsPaths, injectHtml, patchBuiltJs, prepareStaticWeb } from "../build/prepare-static-web.mjs"
 
 const tempDirs = []
 
@@ -41,26 +41,35 @@ describe("prepare-static-web", () => {
     expect(result.updated).toContain('window.__OPENCODE_SERVER_URL||location.origin')
   })
 
-  test("prepareStaticWeb copies assets, injects tags, and patches built JS", async () => {
-    const source = await makeTempDir("prepare-static-web-source-")
-    const target = await makeTempDir("prepare-static-web-target-")
+  test("getReferencedJsPaths returns only local JS assets from index.html", () => {
+    const html = [
+      '<link rel="modulepreload" href="/assets/chunk-1.js?x=1">',
+      '<script type="module" src="./assets/app.js"></script>',
+      '<script src="https://cdn.example.com/remote.js"></script>',
+    ].join("\n")
+
+    expect(getReferencedJsPaths(html)).toEqual(["/assets/chunk-1.js", "./assets/app.js"])
+  })
+
+  test("prepareStaticWeb patches only referenced JS assets in place", async () => {
+    const distDir = await makeTempDir("prepare-static-web-dist-")
+    await writeFile(path.join(distDir, "assets-app.js"), 'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
+    await writeFile(path.join(distDir, "unused.js"), 'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
 
     await writeFile(
-      path.join(source, "index.html"),
-      '<html><head><script type="module" src="/assets/app.js"></script></head><body></body></html>',
-    )
-    await writeFile(
-      path.join(source, "app.js"),
-      'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
+      path.join(distDir, "index.html"),
+      '<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
     )
 
-    await prepareStaticWeb(source, target)
+    await prepareStaticWeb(distDir)
 
-    const html = await readFile(path.join(target, "index.html"), "utf8")
-    const js = await readFile(path.join(target, "app.js"), "utf8")
+    const html = await readFile(path.join(distDir, "index.html"), "utf8")
+    const js = await readFile(path.join(distDir, "assets-app.js"), "utf8")
+    const untouched = await readFile(path.join(distDir, "unused.js"), "utf8")
 
     expect(html).toContain('/runtime-config.js')
     expect(html).toContain('id="opencode-web-customizations"')
     expect(js).toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
+    expect(untouched).not.toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
   })
 })

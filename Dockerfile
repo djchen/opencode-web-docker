@@ -26,13 +26,13 @@ COPY opencode/packages/opencode/script/fix-node-pty.ts ./opencode/packages/openc
 RUN bun install --cwd opencode --frozen-lockfile
 
 COPY opencode ./opencode
-COPY scripts/check-runtime-config-compat.mjs ./scripts/check-runtime-config-compat.mjs
-COPY scripts/build-compat ./scripts/build-compat
-COPY scripts/customization-css.mjs ./scripts/customization-css.mjs
-COPY scripts/prepare-static-web.mjs ./scripts/prepare-static-web.mjs
-RUN bun ./scripts/check-runtime-config-compat.mjs
+COPY build/check-runtime-config-compat.mjs ./build/check-runtime-config-compat.mjs
+COPY tests ./tests
+COPY build/customization-css.mjs ./build/customization-css.mjs
+COPY build/prepare-static-web.mjs ./build/prepare-static-web.mjs
+RUN bun ./build/check-runtime-config-compat.mjs
 RUN bun run --cwd opencode/packages/app build
-RUN bun ./scripts/prepare-static-web.mjs ./opencode/packages/app/dist /tmp/site
+RUN bun ./build/prepare-static-web.mjs ./opencode/packages/app/dist
 
 FROM ghcr.io/static-web-server/static-web-server:2-alpine
 
@@ -47,14 +47,14 @@ LABEL org.opencontainers.image.version="$VERSION"
 LABEL org.opencontainers.image.revision="$REVISION"
 LABEL org.opencontainers.image.licenses="MIT"
 
-COPY --chown=sws:sws sws.toml /home/sws/sws.toml
-COPY --chown=sws:sws runtime-config.sh /usr/local/bin/runtime-config.sh
-COPY --chown=sws:sws scripts/runtime-config-core.js /usr/local/share/opencode-web/runtime-config-core.js
-COPY --chown=sws:sws --from=build /tmp/site/ /home/sws/public/
+COPY --chown=sws:sws config/sws.toml /home/sws/sws.toml
+COPY --chown=sws:sws runtime/entrypoint.sh /usr/local/bin/runtime-config.sh
+COPY --chown=sws:sws runtime/runtime-config-core.js /usr/local/share/opencode-web/runtime-config-core.js
+COPY --chown=sws:sws --from=build /app/opencode/packages/app/dist/ /home/sws/public/
 
 RUN chmod +x /usr/local/bin/runtime-config.sh
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1/index.html || exit 1
 
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/runtime-config.sh"]

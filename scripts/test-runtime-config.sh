@@ -75,7 +75,7 @@ expect_failure \
     true
 
 expect_failure \
-  "reject invalid force-default aliases" \
+  "reject invalid force-default values" \
   "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index." \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=x \
@@ -93,11 +93,27 @@ expect_failure \
     true
 
 expect_failure \
+  "reject padded backend indexes" \
+  "Configured backend variable names must use unpadded integer indexes starting at 1. Invalid variable: OPENCODE_SERVER_01_URL." \
+  docker run --rm \
+    -e OPENCODE_SERVER_01_URL=http://api1.example.com \
+    "$image_tag" \
+    true
+
+expect_failure \
   "reject non-contiguous backend indexes" \
   "Configured backend indexes must be contiguous starting at 1. Missing index 2." \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=http://api1.example.com \
     -e OPENCODE_SERVER_3_URL=http://api3.example.com \
+    "$image_tag" \
+    true
+
+expect_failure \
+  "reject empty required backend URLs" \
+  "OPENCODE_SERVER_1_URL is required and must not be empty after normalization." \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL='   ' \
     "$image_tag" \
     true
 

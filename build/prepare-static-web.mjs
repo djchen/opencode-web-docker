@@ -1,10 +1,11 @@
-import { cp, readFile, readdir, writeFile } from "node:fs/promises"
+import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { customizationCss } from "./customization-css.mjs"
 
 export const runtimeTag = '    <script src="/runtime-config.js"></script>\n'
 export const customizationTag = `    <style id="opencode-web-customizations">\n${customizationCss}\n    </style>\n`
 export const serverUrlPattern = /((?:window\.)?location\.hostname\.includes\("opencode\.ai"\)\s*\?\s*"[^"]+"\s*:)\s*((?:window\.)?location\.origin)/g
+export const referencedJsPattern = /<(?:script|link)\b[^>]+(?:src|href)=["']([^"']+\.js(?:\?[^"'#]*)?(?:#[^"']*)?)["'][^>]*>/g
 
 export function injectHtml(html) {
   const htmlInjections = []
@@ -23,17 +24,17 @@ export function injectHtml(html) {
   return updated
 }
 
-export async function findJsFiles(dir) {
-  const files = []
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      files.push(...await findJsFiles(fullPath))
-    } else if (entry.name.endsWith(".js")) {
-      files.push(fullPath)
-    }
+export function getReferencedJsPaths(html) {
+  const referencedJsPaths = new Set()
+
+  for (const match of html.matchAll(referencedJsPattern)) {
+    const assetPath = match[1].split("#", 1)[0].split("?", 1)[0]
+    if (/^(?:https?:)?\/\//.test(assetPath)) continue
+    if (assetPath === "/runtime-config.js" || assetPath === "runtime-config.js") continue
+    referencedJsPaths.add(assetPath)
   }
-  return files
+
+  return [...referencedJsPaths]
 }
 
 export function patchBuiltJs(content) {
@@ -44,20 +45,24 @@ export function patchBuiltJs(content) {
   }
 }
 
-export async function prepareStaticWeb(source, target) {
-  if (!source || !target) {
-    throw new Error("usage: bun scripts/prepare-static-web.mjs <source-dist> <target-dir>")
+function resolveAssetPath(rootDir, assetPath) {
+  if (assetPath.startsWith("/")) return path.join(rootDir, assetPath.slice(1))
+  return path.resolve(rootDir, assetPath)
+}
+
+export async function prepareStaticWeb(distDir) {
+  if (!distDir) {
+    throw new Error("usage: bun scripts/prepare-static-web.mjs <dist-dir>")
   }
 
-  const htmlPath = path.join(target, "index.html")
-  await cp(source, target, { recursive: true, force: true })
-
+  const htmlPath = path.join(distDir, "index.html")
   const html = await readFile(htmlPath, "utf8")
   const updatedHtml = injectHtml(html)
   if (updatedHtml !== html) await writeFile(htmlPath, updatedHtml)
 
   let patched = false
-  for (const filePath of await findJsFiles(target)) {
+  for (const assetPath of getReferencedJsPaths(updatedHtml)) {
+    const filePath = resolveAssetPath(distDir, assetPath)
     const content = await readFile(filePath, "utf8")
     if (!content.includes("opencode.ai")) continue
     const result = patchBuiltJs(content)
@@ -78,6 +83,6 @@ export async function prepareStaticWeb(source, target) {
 }
 
 if (import.meta.main) {
-  const [source, target] = process.argv.slice(2)
-  await prepareStaticWeb(source, target)
+  const [distDir] = process.argv.slice(2)
+  await prepareStaticWeb(distDir)
 }
