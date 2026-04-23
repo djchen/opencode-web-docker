@@ -72,7 +72,7 @@ expect_generated_runtime_config_parses() {
 
   printf '==> %s\n' "$name"
   runtime_config_js="$("$@")"
-  printf '%s' "$runtime_config_js" | bun -e 'new Function(await Bun.stdin.text())'
+  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function(source)});'
 }
 
 expect_failure \
