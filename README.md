@@ -49,6 +49,7 @@ All configuration is via environment variables, applied at container start.
 | `OPENCODE_SERVER_<N>_USERNAME` | no | — | HTTP basic-auth username for server `N`. Stored in browser localStorage |
 | `OPENCODE_SERVER_<N>_PASSWORD` | no | — | HTTP basic-auth password for server `N`. Stored in browser localStorage |
 | `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | `true` or unset forces server `1`; `false` preserves a valid browser default; integer `N` forces server `N` |
+| `OPENCODE_APP_TITLE` | no | — | Browser tab title to apply after runtime config loads |
 
 Rules:
 
@@ -56,6 +57,7 @@ Rules:
 - URLs are normalized by trimming whitespace, adding `http://` when missing, and removing trailing slashes.
 - `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`.
 - Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
+- `OPENCODE_APP_TITLE`, when set, updates the browser tab title only. It does not change visible in-app branding.
 
 Example:
 
@@ -67,6 +69,7 @@ OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
 OPENCODE_SERVER_2_NAME: Server 2
 
 OPENCODE_FORCE_DEFAULT_SERVER: 1
+OPENCODE_APP_TITLE: Hosted OpenCode
 ```
 
 **IMPORTANT**: `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written into browser localStorage at runtime. **Do not set these for public deployments.** Let users enter credentials in the app instead.
@@ -75,10 +78,10 @@ OPENCODE_FORCE_DEFAULT_SERVER: 1
 ## How It Works
 
 1. **Build time** — The upstream OpenCode web app is built, then:
-   - `build/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, injects the customization CSS from `build/customization-css.mjs`, and patches only the JS assets referenced from `index.html` in place.
+   - `build/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` and a static `<link rel="stylesheet" href="/opencode-web-customizations.css">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, writes the customization CSS from `build/customization-css.mjs` as a standalone asset, and patches only the JS assets referenced from `index.html` in place.
    - `build/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected build or runtime scripts.
 2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, avoids redundant localStorage rewrites when nothing changed, and removes `location.origin` when it would otherwise appear as a fake backend.
-3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config.
+3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html` so browsers always fetch fresh config, and the customization CSS now ships as a regular static file so the CSP no longer needs `'unsafe-inline'` for styles.
 
 Default server behavior:
 

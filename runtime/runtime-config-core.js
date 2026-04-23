@@ -2,7 +2,7 @@ function warnIncompatibleStore(reason) {
   console.warn(
     "OpenCode runtime-config may be incompatible with this upstream build:",
     reason,
-    "Review runtime-config.sh and scripts/runtime-config-core.js against upstream app persistence.",
+    "Review runtime/entrypoint.sh and runtime/runtime-config-core.js against upstream app persistence.",
   )
 }
 
@@ -124,6 +124,11 @@ function listHasUrl(list, url) {
 }
 
 try {
+  var nextTitle = decodeBase64(appTitle).trim()
+  if (nextTitle && typeof document === "object" && document) {
+    document.title = nextTitle
+  }
+
   var persisted = readState()
   var state = persisted.state
   var indexedState = buildExistingStateIndex(state.list)

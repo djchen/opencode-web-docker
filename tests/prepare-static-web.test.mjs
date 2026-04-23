@@ -2,7 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
-import { getReferencedJsPaths, injectHtml, patchBuiltJs, prepareStaticWeb } from "../build/prepare-static-web.mjs"
+import {
+  customizationCssFileName,
+  getReferencedJsPaths,
+  injectHtml,
+  patchBuiltJs,
+  prepareStaticWeb,
+} from "../build/prepare-static-web.mjs"
 
 const tempDirs = []
 
@@ -17,7 +23,7 @@ async function makeTempDir(prefix) {
 }
 
 describe("prepare-static-web", () => {
-  test("injectHtml adds runtime-config and customization tags before the module script", () => {
+  test("injectHtml adds runtime-config and customization asset tags before the module script", () => {
     const html = [
       "<html>",
       "  <head>",
@@ -29,7 +35,7 @@ describe("prepare-static-web", () => {
     const updated = injectHtml(html)
 
     expect(updated).toContain('<script src="/runtime-config.js"></script>')
-    expect(updated).toContain('id="opencode-web-customizations"')
+    expect(updated).toContain(`<link rel="stylesheet" href="/${customizationCssFileName}">`)
     expect(updated.indexOf('/runtime-config.js')).toBeLessThan(updated.indexOf('type="module"'))
   })
 
@@ -51,7 +57,7 @@ describe("prepare-static-web", () => {
     expect(getReferencedJsPaths(html)).toEqual(["/assets/chunk-1.js", "./assets/app.js"])
   })
 
-  test("prepareStaticWeb patches only referenced JS assets in place", async () => {
+  test("prepareStaticWeb writes the customization asset and patches only referenced JS assets in place", async () => {
     const distDir = await makeTempDir("prepare-static-web-dist-")
     await writeFile(path.join(distDir, "assets-app.js"), 'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
     await writeFile(path.join(distDir, "unused.js"), 'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
@@ -64,11 +70,13 @@ describe("prepare-static-web", () => {
     await prepareStaticWeb(distDir)
 
     const html = await readFile(path.join(distDir, "index.html"), "utf8")
+    const css = await readFile(path.join(distDir, customizationCssFileName), "utf8")
     const js = await readFile(path.join(distDir, "assets-app.js"), "utf8")
     const untouched = await readFile(path.join(distDir, "unused.js"), "utf8")
 
     expect(html).toContain('/runtime-config.js')
-    expect(html).toContain('id="opencode-web-customizations"')
+    expect(html).toContain(`/${customizationCssFileName}`)
+    expect(css).toContain('[data-component="sidebar-rail"]')
     expect(js).toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
     expect(untouched).not.toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
   })

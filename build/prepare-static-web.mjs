@@ -3,22 +3,23 @@ import path from "node:path"
 import { customizationCss } from "./customization-css.mjs"
 
 export const runtimeTag = '    <script src="/runtime-config.js"></script>\n'
-export const customizationTag = `    <style id="opencode-web-customizations">\n${customizationCss}\n    </style>\n`
+export const customizationCssFileName = "opencode-web-customizations.css"
+export const customizationTag = `    <link rel="stylesheet" href="/${customizationCssFileName}">\n`
 export const serverUrlPattern = /((?:window\.)?location\.hostname\.includes\("opencode\.ai"\)\s*\?\s*"[^"]+"\s*:)\s*((?:window\.)?location\.origin)/g
 export const referencedJsPattern = /<(?:script|link)\b[^>]+(?:src|href)=["']([^"']+\.js(?:\?[^"'#]*)?(?:#[^"']*)?)["'][^>]*>/g
 
 export function injectHtml(html) {
   const htmlInjections = []
   if (!html.includes("/runtime-config.js")) htmlInjections.push(runtimeTag)
-  if (!html.includes('id="opencode-web-customizations"')) htmlInjections.push(customizationTag)
+  if (!html.includes(`/${customizationCssFileName}`)) htmlInjections.push(customizationTag)
   if (!htmlInjections.length) return html
 
   const updated = html.includes('<script type="module"')
     ? html.replace('<script type="module"', `${htmlInjections.join("")}    <script type="module"`)
     : html.replace("</head>", `${htmlInjections.join("")}</head>`)
 
-  if (!updated.includes("/runtime-config.js") || !updated.includes('id="opencode-web-customizations"')) {
-    throw new Error("Failed to inject runtime-config or customization tags into built index.html")
+  if (!updated.includes("/runtime-config.js") || !updated.includes(`/${customizationCssFileName}`)) {
+    throw new Error("Failed to inject runtime-config or customization asset tags into built index.html")
   }
 
   return updated
@@ -52,12 +53,14 @@ function resolveAssetPath(rootDir, assetPath) {
 
 export async function prepareStaticWeb(distDir) {
   if (!distDir) {
-    throw new Error("usage: bun scripts/prepare-static-web.mjs <dist-dir>")
+    throw new Error("usage: bun build/prepare-static-web.mjs <dist-dir>")
   }
 
   const htmlPath = path.join(distDir, "index.html")
+  const customizationCssPath = path.join(distDir, customizationCssFileName)
   const html = await readFile(htmlPath, "utf8")
   const updatedHtml = injectHtml(html)
+  await writeFile(customizationCssPath, `${customizationCss}\n`)
   if (updatedHtml !== html) await writeFile(htmlPath, updatedHtml)
 
   let patched = false
