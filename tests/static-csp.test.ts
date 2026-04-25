@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildExpectedStaticWebCsp } from "./static-csp.contracts.mjs"
+import { buildExpectedStaticWebCsp } from "./static-csp.contracts"
 
 describe("static CSP compatibility", () => {
   test("adds only deployment-specific directives to upstream CSP", () => {

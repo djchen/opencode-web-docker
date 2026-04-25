@@ -14,7 +14,14 @@
   },
   "scripts": {
     "test:build-compat": "bun test tests",
+    "typecheck": "tsc --noEmit",
+    "build:runtime": "bun run build/transpile-runtime.ts",
     "docker:build": "docker build -t opencode-web-docker .",
     "upstream:update": "./scripts/update-opencode-release.sh"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "^1.0.0",
+    "@types/bun": "1.2.5",
+    "typescript": "5.8.x"
   }
 }

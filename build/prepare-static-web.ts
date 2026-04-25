@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { customizationCss } from "./customization-css.mjs"
+import { customizationCss } from "./customization-css"
 
 export const runtimeTag = '    <script src="/runtime-config.js"></script>\n'
 export const customizationCssFileName = "opencode-web-customizations.css"
@@ -12,8 +12,8 @@ export const serverUrlPatchedMarkers = [
   "window.__OPENCODE_SERVER_URL||window.location.origin",
 ]
 
-export function injectHtml(html) {
-  const htmlInjections = []
+export function injectHtml(html: string): string {
+  const htmlInjections: string[] = []
   if (!html.includes("/runtime-config.js")) htmlInjections.push(runtimeTag)
   if (!html.includes(`/${customizationCssFileName}`)) htmlInjections.push(customizationTag)
   if (!htmlInjections.length) return html
@@ -29,11 +29,11 @@ export function injectHtml(html) {
   return updated
 }
 
-export function getReferencedJsPaths(html) {
-  const referencedJsPaths = new Set()
+export function getReferencedJsPaths(html: string): string[] {
+  const referencedJsPaths = new Set<string>()
 
   for (const match of html.matchAll(referencedJsPattern)) {
-    const assetPath = match[1].split("#", 1)[0].split("?", 1)[0]
+    const assetPath = match[1]!.split("#", 1)[0]!.split("?", 1)[0]!
     if (/^(?:https?:)?\/\//.test(assetPath)) continue
     if (assetPath === "/runtime-config.js" || assetPath === "runtime-config.js") continue
     referencedJsPaths.add(assetPath)
@@ -42,7 +42,13 @@ export function getReferencedJsPaths(html) {
   return [...referencedJsPaths]
 }
 
-export function patchBuiltJs(content) {
+export interface PatchResult {
+  updated: string
+  patched: boolean
+  serverUrlPatched: boolean
+}
+
+export function patchBuiltJs(content: string): PatchResult {
   let updated = content
   let serverUrlPatched = serverUrlPatchedMarkers.some((marker) => updated.includes(marker))
 
@@ -58,14 +64,14 @@ export function patchBuiltJs(content) {
   }
 }
 
-function resolveAssetPath(rootDir, assetPath) {
+function resolveAssetPath(rootDir: string, assetPath: string): string {
   if (assetPath.startsWith("/")) return path.join(rootDir, assetPath.slice(1))
   return path.resolve(rootDir, assetPath)
 }
 
-export async function prepareStaticWeb(distDir) {
+export async function prepareStaticWeb(distDir: string): Promise<void> {
   if (!distDir) {
-    throw new Error("usage: bun build/prepare-static-web.mjs <dist-dir>")
+    throw new Error("usage: bun build/prepare-static-web.ts <dist-dir>")
   }
 
   const htmlPath = path.join(distDir, "index.html")
@@ -90,13 +96,16 @@ export async function prepareStaticWeb(distDir) {
       [
         "Failed to patch getCurrentUrl fallback in built JS.",
         "The upstream app may have changed its runtime-sensitive implementation.",
-        "Review opencode/packages/app/src/entry.tsx and update prepare-static-web.mjs accordingly.",
+        "Review opencode/packages/app/src/entry.tsx and update prepare-static-web.ts accordingly.",
       ].join("\n"),
     )
   }
 }
 
 if (import.meta.main) {
-  const [distDir] = process.argv.slice(2)
+  const distDir = process.argv[2]
+  if (!distDir) {
+    throw new Error("usage: bun build/prepare-static-web.ts <dist-dir>")
+  }
   await prepareStaticWeb(distDir)
 }

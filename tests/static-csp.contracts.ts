@@ -1,32 +1,35 @@
+import { every, match } from "./core"
+import type { Contract } from "./core"
+
 const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/
 const staticWebCspPattern = /Content-Security-Policy\s*=\s*"([^"]+)"/
 
 const connectSrcAdditions = ["http:", "https:", "ws:", "wss:"]
 const scriptSrcAdditions = ["'unsafe-inline'"]
-const extraDirectives = {
+const extraDirectives: Record<string, string[]> = {
   "base-uri": ["'self'"],
   "frame-ancestors": ["'none'"],
   "object-src": ["'none'"],
 }
 
-export const staticCspSources = {
+export const staticCspSources: Record<string, string> = {
   staticWebConfig: "config/sws.toml",
   uiRoutes: "opencode/packages/opencode/src/server/routes/ui.ts",
 }
 
-export function extractUpstreamDefaultCsp(source) {
-  const match = source.match(upstreamDefaultCspPattern)
-  if (!match) throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts")
-  return match[1]
+export function extractUpstreamDefaultCsp(source: string): string {
+  const cspMatch = source.match(upstreamDefaultCspPattern)
+  if (!cspMatch) throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts")
+  return cspMatch[1]!
 }
 
-export function extractStaticWebCsp(source) {
-  const match = source.match(staticWebCspPattern)
-  if (!match) throw new Error("Could not locate Content-Security-Policy in config/sws.toml")
-  return match[1]
+export function extractStaticWebCsp(source: string): string {
+  const cspMatch = source.match(staticWebCspPattern)
+  if (!cspMatch) throw new Error("Could not locate Content-Security-Policy in config/sws.toml")
+  return cspMatch[1]!
 }
 
-export function parseCsp(csp) {
+export function parseCsp(csp: string): Map<string, string[]> {
   return new Map(
     csp
       .split(";")
@@ -34,16 +37,16 @@ export function parseCsp(csp) {
       .filter(Boolean)
       .map((directive) => {
         const [name, ...values] = directive.split(/\s+/)
-        return [name, values]
+        return [name!, values] as const
       }),
   )
 }
 
-function mergeValues(values, additions) {
+function mergeValues(values: string[], additions: string[]): string[] {
   return [...values, ...additions.filter((value) => !values.includes(value))]
 }
 
-export function buildExpectedStaticWebCsp(upstreamDefaultCsp) {
+export function buildExpectedStaticWebCsp(upstreamDefaultCsp: string): Map<string, string[]> {
   const upstream = parseCsp(upstreamDefaultCsp)
   const expected = new Map(upstream.entries())
 
@@ -57,11 +60,11 @@ export function buildExpectedStaticWebCsp(upstreamDefaultCsp) {
   return expected
 }
 
-function sameValues(actual, expected) {
+function sameValues(actual: string[], expected: string[]): boolean {
   return actual.length === expected.length && [...actual].sort().every((value, index) => value === [...expected].sort()[index])
 }
 
-export function sameCsp(actual, expected) {
+export function sameCsp(actual: Map<string, string[]>, expected: Map<string, string[]>): boolean {
   const actualKeys = [...actual.keys()].sort()
   const expectedKeys = [...expected.keys()].sort()
 
@@ -70,14 +73,14 @@ export function sameCsp(actual, expected) {
   return actualKeys.every((key) => sameValues(actual.get(key) ?? [], expected.get(key) ?? []))
 }
 
-export function matchesUpstreamStaticCsp(files) {
+export function matchesUpstreamStaticCsp(files: Record<string, string>): boolean {
   return sameCsp(
-    parseCsp(extractStaticWebCsp(files.staticWebConfig)),
-    buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files.uiRoutes)),
+    parseCsp(extractStaticWebCsp(files["staticWebConfig"]!)),
+    buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files["uiRoutes"]!)),
   )
 }
 
-export const staticCspContracts = [
+export const staticCspContracts: Contract[] = [
   {
     area: "static-web CSP",
     hint: "If upstream changed its DEFAULT_CSP directives, update config/sws.toml to match (plus the wrapper's additions); if the wrapper's extra directives changed intent, update the contract expectations.",

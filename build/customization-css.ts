@@ -72,6 +72,46 @@ export const customizationCss = `
   background: #eab308 !important;
 }
 
+[data-component="opencode-web-sync-panel"][data-status="first-sync-pending"] [data-component="sync-status-dot"] {
+  background: #eab308 !important;
+}
+
+[data-component="opencode-web-sync-panel"][data-status="disabled"] [data-component="sync-status-dot"] {
+  background: #6b7280 !important;
+}
+
+[data-component="sync-choice-btn"] {
+  width: 100% !important;
+  padding: 6px 12px !important;
+  border: 1px solid var(--border, #444) !important;
+  border-radius: 6px !important;
+  background: var(--background, #222) !important;
+  color: var(--foreground, #fff) !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+}
+
+[data-component="sync-choice-btn"]:hover {
+  background: var(--background-contrast, rgba(255,255,255,0.08)) !important;
+}
+
+[data-component="sync-choice-btn-primary"] {
+  width: 100% !important;
+  padding: 6px 12px !important;
+  border: 1px solid var(--border, #444) !important;
+  border-radius: 6px !important;
+  background: var(--background-contrast, rgba(255,255,255,0.12)) !important;
+  color: var(--foreground, #fff) !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+}
+
+[data-component="sync-choice-btn-primary"]:hover {
+  background: var(--background-contrast, rgba(255,255,255,0.18)) !important;
+}
+
 [data-component="opencode-web-sync-panel"] [data-component="sync-status-label"] {
   flex: 1 !important;
 }

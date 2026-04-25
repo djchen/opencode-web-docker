@@ -1,17 +1,18 @@
-import { every, match } from "./core.mjs"
+import { every, match } from "./core"
+import type { Check, Contract } from "./core"
 
 export const entrySourcePath = "opencode/packages/app/src/entry.tsx"
 
-export const runtimeConfigSources = {
+export const runtimeConfigSources: Record<string, string> = {
   entry: entrySourcePath,
   persist: "opencode/packages/app/src/utils/persist.ts",
   server: "opencode/packages/app/src/context/server.tsx",
 }
 
-export const runtimeConfigContracts = [
+export const runtimeConfigContracts: Contract[] = [
   {
     area: "runtime-config persistence",
-    hint: "If a localStorage key name or type shape changed, update runtime/runtime-config-core.js; if only the internal variable was renamed, update the contract regex.",
+    hint: "If a localStorage key name or type shape changed, update runtime/runtime-config-core.ts; if only the internal variable was renamed, update the contract regex.",
     checks: [
       match(
         "entry",

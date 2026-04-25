@@ -92,9 +92,10 @@ OPENCODE_SETTINGS_SYNC_AUTH_HEADER: "Bearer my-token"
 ## How It Works
 
 1. **Build time** — The upstream OpenCode web app is built, then:
-   - `build/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` and a static `<link rel="stylesheet" href="/opencode-web-customizations.css">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, writes the customization CSS from `build/customization-css.mjs` as a standalone asset, and patches only the JS assets referenced from `index.html` in place.
-   - `build/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected build or runtime scripts.
-2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` by concatenating a JS preamble (with env var assignments), `runtime/runtime-config-core.js`, and `runtime/sync-client.js`. The generated script is synchronous (no `await`) and runs as a blocking `<script>` before the app bundle. It writes the configured server into browser localStorage, removes `location.origin` when it would otherwise appear as a fake backend, avoids redundant writes, and sets `window.__OPENCODE_SERVER_URL`. If `OPENCODE_SETTINGS_SYNC_URL` is set, it also initializes the settings sync client.
+   - `build/prepare-static-web.ts` injects `<script src="/runtime-config.js">` and a static `<link rel="stylesheet" href="/opencode-web-customizations.css">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, writes the customization CSS from `build/customization-css.ts` as a standalone asset, and patches only the JS assets referenced from `index.html` in place.
+   - `build/check-runtime-config-compat.ts` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected build or runtime scripts.
+   - `build/transpile-runtime.ts` bundles the runtime TypeScript modules (`runtime/index.ts` → imports `runtime-config-core.ts`, `blob-sync.ts`, `sync-client.ts`) into a single IIFE file `dist/runtime/runtime-bundle.js` via `Bun.build()`.
+2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` by concatenating a JS preamble (with env var assignments) and the pre-built `runtime-bundle.js`. The generated script is synchronous (no `await`) and runs as a blocking `<script>` before the app bundle. It writes the configured server into browser localStorage, removes `location.origin` when it would otherwise appear as a fake backend, avoids redundant writes, and sets `window.__OPENCODE_SERVER_URL`. If `OPENCODE_SETTINGS_SYNC_URL` is set, it also initializes the settings sync client.
 3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html`.
 
 ## Updating Upstream OpenCode
@@ -109,7 +110,7 @@ OPENCODE_SETTINGS_SYNC_AUTH_HEADER: "Bearer my-token"
 
 Then rebuild the image (`docker build -t opencode-web-docker .`).
 
-If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update `runtime/entrypoint.sh`, `runtime/runtime-config-core.js`, or `runtime/sync-client.js` before rebuilding.
+If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update `runtime/entrypoint.sh`, `runtime/runtime-config-core.ts`, or `runtime/sync-client.ts` before rebuilding.
 
 Repository-owned verification:
 

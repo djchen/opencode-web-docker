@@ -1,19 +1,33 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-export const match = (file, pattern, message) => ({
+export interface Check {
+  file: string
+  message: string
+  test: (files: Record<string, string>) => boolean
+}
+
+export interface Contract {
+  area: string
+  hint?: string
+  checks: Check[]
+}
+
+export type Sources = Record<string, string>
+
+export const match = (file: string, pattern: RegExp, message: string): Check => ({
   file,
   message,
-  test: (files) => pattern.test(files[file]),
+  test: (files) => pattern.test(files[file]!),
 })
 
-export const every = (file, patterns, message) => ({
+export const every = (file: string, patterns: RegExp[], message: string): Check => ({
   file,
   message,
-  test: (files) => patterns.every((pattern) => pattern.test(files[file])),
+  test: (files) => patterns.every((pattern) => pattern.test(files[file]!)),
 })
 
-export async function loadSources(root, sources) {
+export async function loadSources(root: string, sources: Sources): Promise<Record<string, string>> {
   return Object.fromEntries(
     await Promise.all(
       Object.entries(sources).map(async ([key, relativePath]) => [
@@ -24,7 +38,7 @@ export async function loadSources(root, sources) {
   )
 }
 
-export function validateContracts(sources, contracts) {
+export function validateContracts(sources: Sources, contracts: Contract[]): void {
   const keys = new Set(Object.keys(sources))
   const unknown = contracts.flatMap((contract) =>
     contract.checks
@@ -43,7 +57,7 @@ export function validateContracts(sources, contracts) {
   )
 }
 
-export function runContracts(files, contracts) {
+export function runContracts(files: Record<string, string>, contracts: Contract[]): { area: string; message: string }[] {
   return contracts.flatMap((contract) => {
     const failures = contract.checks
       .filter((check) => !check.test(files))
@@ -57,12 +71,12 @@ export function runContracts(files, contracts) {
   })
 }
 
-export function formatFailures(failures, contracts = []) {
-  const hintsByArea = new Map(
-    contracts.filter((c) => c.hint).map((c) => [c.area, c.hint]),
+export function formatFailures(failures: { area: string; message: string }[], contracts: Contract[] = []): string[] {
+  const hintsByArea = new Map<string, string>(
+    contracts.filter((c) => c.hint).map((c) => [c.area, c.hint!]),
   )
 
-  const grouped = new Map()
+  const grouped = new Map<string, string[]>()
 
   for (const failure of failures) {
     const list = grouped.get(failure.area) ?? []

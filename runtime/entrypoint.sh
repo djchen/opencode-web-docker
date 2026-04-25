@@ -34,15 +34,11 @@ b64enc() {
 }
 
 runtime_root="/opt/opencode-web"
-runtime_config_core_path="$runtime_root/runtime/runtime-config-core.js"
-runtime_sync_client_path="$runtime_root/runtime/sync-client.js"
+runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
 runtime_config_path="$runtime_root/public/runtime-config.js"
 
-if [ ! -r "$runtime_config_core_path" ]; then
-  die "Missing runtime-config core JS at $runtime_config_core_path"
-fi
-if [ ! -r "$runtime_sync_client_path" ]; then
-  die "Missing sync client JS at $runtime_sync_client_path"
+if [ ! -r "$runtime_bundle_path" ]; then
+  die "Missing runtime bundle at $runtime_bundle_path"
 fi
 
 server_url_raw="$(get_env OPENCODE_SERVER_URL)"
@@ -85,8 +81,6 @@ var settingsSyncUsername = _b64d("${settings_sync_username_b64}")
 var settingsSyncPassword = _b64d("${settings_sync_password_b64}")
 EOF
 
-cat "$runtime_config_core_path" >> "$runtime_config_path"
-printf '\n' >> "$runtime_config_path"
-cat "$runtime_sync_client_path" >> "$runtime_config_path"
+cat "$runtime_bundle_path" >> "$runtime_config_path"
 
 exec "$@"

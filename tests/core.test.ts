@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { every, formatFailures, match, runContracts, validateContracts } from "./core.mjs"
+import { every, formatFailures, match, runContracts, validateContracts } from "./core"
+import type { Contract } from "./core"
 
 describe("runtime-config compatibility helpers", () => {
   test("runContracts returns grouped failure entries", () => {
-    const contracts = [
+    const contracts: Contract[] = [
       {
         area: "example area",
         checks: [
@@ -46,7 +47,7 @@ describe("runtime-config compatibility helpers", () => {
   })
 
   test("formatFailures includes per-area hints from contracts", () => {
-    const contracts = [
+    const contracts: Contract[] = [
       { area: "patch A", hint: "Update patch A.", checks: [] },
       { area: "patch B", hint: "Update patch B.", checks: [] },
       { area: "patch C", checks: [] },
