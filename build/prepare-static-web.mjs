@@ -7,6 +7,10 @@ export const customizationCssFileName = "opencode-web-customizations.css"
 export const customizationTag = `    <link rel="stylesheet" href="/${customizationCssFileName}">\n`
 export const serverUrlPattern = /((?:window\.)?location\.hostname\.includes\("opencode\.ai"\)\s*\?\s*"[^"]+"\s*:)\s*((?:window\.)?location\.origin)/g
 export const referencedJsPattern = /<(?:script|link)\b[^>]+(?:src|href)=["']([^"']+\.js(?:\?[^"'#]*)?(?:#[^"']*)?)["'][^>]*>/g
+export const serverUrlPatchedMarkers = [
+  "window.__OPENCODE_SERVER_URL||location.origin",
+  "window.__OPENCODE_SERVER_URL||window.location.origin",
+]
 
 export function injectHtml(html) {
   const htmlInjections = []
@@ -39,10 +43,18 @@ export function getReferencedJsPaths(html) {
 }
 
 export function patchBuiltJs(content) {
-  const updated = content.replace(serverUrlPattern, "$1window.__OPENCODE_SERVER_URL||$2")
+  let updated = content
+  let serverUrlPatched = serverUrlPatchedMarkers.some((marker) => updated.includes(marker))
+
+  if (!serverUrlPatched) {
+    updated = updated.replace(serverUrlPattern, "$1window.__OPENCODE_SERVER_URL||$2")
+    serverUrlPatched = updated !== content
+  }
+
   return {
     updated,
     patched: updated !== content,
+    serverUrlPatched,
   }
 }
 
@@ -63,22 +75,21 @@ export async function prepareStaticWeb(distDir) {
   await writeFile(customizationCssPath, `${customizationCss}\n`)
   if (updatedHtml !== html) await writeFile(htmlPath, updatedHtml)
 
-  let patched = false
+  let serverUrlPatched = false
   for (const assetPath of getReferencedJsPaths(updatedHtml)) {
     const filePath = resolveAssetPath(distDir, assetPath)
     const content = await readFile(filePath, "utf8")
-    if (!content.includes("opencode.ai")) continue
     const result = patchBuiltJs(content)
+    if (result.serverUrlPatched) serverUrlPatched = true
     if (!result.patched) continue
     await writeFile(filePath, result.updated)
-    patched = true
   }
 
-  if (!patched) {
+  if (!serverUrlPatched) {
     throw new Error(
       [
         "Failed to patch getCurrentUrl fallback in built JS.",
-        "The upstream app may have changed its getCurrentUrl implementation.",
+        "The upstream app may have changed its runtime-sensitive implementation.",
         "Review opencode/packages/app/src/entry.tsx and update prepare-static-web.mjs accordingly.",
       ].join("\n"),
     )

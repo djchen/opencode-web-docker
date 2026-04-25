@@ -1,6 +1,6 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { contracts, failureHints, sources } from "../tests/index.mjs"
+import { contracts, sources } from "../tests/index.mjs"
 import { formatFailures, loadSources, runContracts, validateContracts } from "../tests/core.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -13,8 +13,7 @@ if (failures.length) {
     [
       "OpenCode compatibility check failed.",
       "",
-      ...formatFailures(failures),
-      ...failureHints,
+      ...formatFailures(failures, contracts),
     ].join("\n"),
   )
 }

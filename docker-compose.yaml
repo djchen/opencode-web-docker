@@ -4,8 +4,9 @@ services:
     ports:
       - 8080:80
     environment:
-      OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
-      OPENCODE_SERVER_1_NAME: Server 1
-      OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
-      OPENCODE_SERVER_2_NAME: Server 2
-      OPENCODE_FORCE_DEFAULT_SERVER: 1
+      OPENCODE_SERVER_URL: https://opencode-api1.example.com
+      OPENCODE_SERVER_NAME: Server 1
+      # Optional: enable settings sync
+      # OPENCODE_SETTINGS_SYNC_URL: https://sync.example.com/v1/sync/users/opencode/settings
+      # OPENCODE_SETTINGS_SYNC_INTERVAL: 30
+      # OPENCODE_SETTINGS_SYNC_AUTH_HEADER: "Bearer my-token"

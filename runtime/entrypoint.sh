@@ -6,10 +6,6 @@ die() {
   exit 1
 }
 
-has_env() {
-  eval "[ \"\${$1+x}\" = x ]"
-}
-
 get_env() {
   eval "printf '%s' \"\${$1-}\""
 }
@@ -33,127 +29,64 @@ normalize_url() {
   printf '%s' "$with_scheme" | sed 's:/*$::'
 }
 
-encode_base64() {
+b64enc() {
   printf '%s' "$1" | base64 | tr -d '\n'
 }
 
-runtime_config_core_path="/usr/local/share/opencode-web/runtime-config-core.js"
-runtime_config_path="/home/sws/public/runtime-config.js"
+runtime_root="/opt/opencode-web"
+runtime_config_core_path="$runtime_root/runtime/runtime-config-core.js"
+runtime_sync_client_path="$runtime_root/runtime/sync-client.js"
+runtime_config_path="$runtime_root/public/runtime-config.js"
+
 if [ ! -r "$runtime_config_core_path" ]; then
   die "Missing runtime-config core JS at $runtime_config_core_path"
 fi
-
-raw_indexes=""
-# Read null-delimited env entries so multiline values cannot inject bogus names.
-env_names="$(env -0 | xargs -0 -n1 sh -c 'entry=$1; printf "%s\n" "${entry%%=*}"' sh)"
-for env_name in $env_names; do
-  case "$env_name" in
-    OPENCODE_SERVER_*_URL|OPENCODE_SERVER_*_NAME|OPENCODE_SERVER_*_USERNAME|OPENCODE_SERVER_*_PASSWORD)
-      suffixless="${env_name#OPENCODE_SERVER_}"
-      index="${suffixless%%_*}"
-      case "$index" in
-        ""|*[!0-9]*|0|0[0-9]*)
-          die "Configured backend variable names must use unpadded integer indexes starting at 1. Invalid variable: $env_name."
-          ;;
-      esac
-      raw_indexes="$raw_indexes $index"
-      ;;
-  esac
-done
-
-if [ -z "$(trim "$raw_indexes")" ]; then
-  die "OPENCODE_SERVER_1_URL is required."
+if [ ! -r "$runtime_sync_client_path" ]; then
+  die "Missing sync client JS at $runtime_sync_client_path"
 fi
 
-indexes="$(printf '%s' "$raw_indexes" | tr ' ' '\n' | sed '/^$/d' | sort -n -u)"
-expected_index=1
-max_index=0
-for index in $indexes; do
-  if [ "$index" -ne "$expected_index" ]; then
-    die "Configured backend indexes must be contiguous starting at 1. Missing index $expected_index."
-  fi
-
-  url_var="OPENCODE_SERVER_${index}_URL"
-  url_value="$(get_env "$url_var")"
-  normalized_url="$(normalize_url "$url_value")"
-  if [ -z "$normalized_url" ]; then
-    die "$url_var is required and must not be empty after normalization."
-  fi
-
-  if [ -n "${normalized_urls-}" ] && printf '%s\n' "$normalized_urls" | grep -F -x -- "$normalized_url" >/dev/null 2>&1; then
-    die "Duplicate configured backend URL after normalization: $normalized_url"
-  fi
-
-  if [ -n "${normalized_urls-}" ]; then
-    normalized_urls="$(printf '%s\n%s' "$normalized_urls" "$normalized_url")"
-  else
-    normalized_urls="$normalized_url"
-  fi
-  max_index="$index"
-  expected_index=$((expected_index + 1))
-done
-
-if has_env OPENCODE_FORCE_DEFAULT_SERVER; then
-  force_default_raw="$(get_env OPENCODE_FORCE_DEFAULT_SERVER)"
-else
-  force_default_raw="true"
+server_url_raw="$(get_env OPENCODE_SERVER_URL)"
+server_url="$(normalize_url "$server_url_raw")"
+if [ -z "$server_url" ]; then
+  die "OPENCODE_SERVER_URL is required and must not be empty after normalization."
 fi
-force_mode="force"
-default_server_index="1"
-app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
 
-case "$force_default_raw" in
-  true)
-    force_mode="force"
-    default_server_index="1"
-    ;;
-  "")
-    die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."
-    ;;
-  false)
-    force_mode="preserve"
-    default_server_index="1"
-    ;;
-  *[!0-9]*)
-    die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."
-    ;;
-  *)
-    if [ "$force_default_raw" -lt 1 ] || [ "$force_default_raw" -gt "$max_index" ]; then
-      die "OPENCODE_FORCE_DEFAULT_SERVER=$force_default_raw is outside the configured backend range 1..$max_index."
-    fi
-    force_mode="force"
-    default_server_index="$force_default_raw"
-    ;;
-esac
+server_name="$(get_env OPENCODE_SERVER_NAME)"
+server_username="$(get_env OPENCODE_SERVER_USERNAME)"
+server_password="$(get_env OPENCODE_SERVER_PASSWORD)"
+app_title="$(get_env OPENCODE_APP_TITLE)"
+settings_sync_url="$(get_env OPENCODE_SETTINGS_SYNC_URL)"
+settings_sync_interval="$(get_env OPENCODE_SETTINGS_SYNC_INTERVAL)"
+settings_sync_auth_header="$(get_env OPENCODE_SETTINGS_SYNC_AUTH_HEADER)"
+settings_sync_username="$(get_env OPENCODE_SETTINGS_SYNC_USERNAME)"
+settings_sync_password="$(get_env OPENCODE_SETTINGS_SYNC_PASSWORD)"
+
+server_url_b64="$(b64enc "$server_url")"
+server_name_b64="$(b64enc "$server_name")"
+server_username_b64="$(b64enc "$server_username")"
+server_password_b64="$(b64enc "$server_password")"
+app_title_b64="$(b64enc "$app_title")"
+settings_sync_url_b64="$(b64enc "$settings_sync_url")"
+settings_sync_auth_header_b64="$(b64enc "$settings_sync_auth_header")"
+settings_sync_username_b64="$(b64enc "$settings_sync_username")"
+settings_sync_password_b64="$(b64enc "$settings_sync_password")"
 
 cat > "$runtime_config_path" <<EOF
-;(function () {
-  var defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
-  var serverStoreKey = "opencode.global.dat:server"
-  var forceDefaultMode = "${force_mode}"
-  var configuredDefaultIndex = ${default_server_index}
-  var appTitle = "${app_title_b64}"
-  var configuredServers = [
+function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}
+var serverUrl = _b64d("${server_url_b64}")
+var serverName = _b64d("${server_name_b64}")
+var serverUsername = _b64d("${server_username_b64}")
+var serverPassword = _b64d("${server_password_b64}")
+var appTitle = _b64d("${app_title_b64}")
+var settingsSyncUrl = _b64d("${settings_sync_url_b64}")
+var settingsSyncInterval = "${settings_sync_interval:-30}"
+var settingsSyncAuthHeader = _b64d("${settings_sync_auth_header_b64}")
+var settingsSyncUsername = _b64d("${settings_sync_username_b64}")
+var settingsSyncPassword = _b64d("${settings_sync_password_b64}")
 EOF
 
-index=1
-while [ "$index" -le "$max_index" ]; do
-  url_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_URL")")"
-  name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
-  username_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
-  password_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"
-  separator=","
-  if [ "$index" -eq "$max_index" ]; then
-    separator=""
-  fi
-
-  printf '    { url: "%s", name: "%s", username: "%s", password: "%s" }%s\n' \
-    "$url_b64" "$name_b64" "$username_b64" "$password_b64" "$separator" >> "$runtime_config_path"
-  index=$((index + 1))
-done
-
-printf '  ]\n' >> "$runtime_config_path"
-
 cat "$runtime_config_core_path" >> "$runtime_config_path"
+printf '\n' >> "$runtime_config_path"
+cat "$runtime_sync_client_path" >> "$runtime_config_path"
 
 exec "$@"

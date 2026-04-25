@@ -1,6 +1,6 @@
 # OpenCode Web Docker
 
-Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with runtime configuration injection. Designed for scenarios where you run multiple OpenCode server backends and want to centrally host the frontend.
+Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with runtime configuration injection. Designed for scenarios where you run an OpenCode server backend and want to centrally host the frontend.
 
 The OpenCode web app is normally tied to a single backend. This container decouples the frontend so it can be pointed at any `opencode serve` instance.
 
@@ -29,11 +29,9 @@ docker compose up -d
 docker run -d \
   --name opencode-web \
   -p 8080:80 \
-  -e OPENCODE_SERVER_1_URL=https://opencode-api1.example.com \
-  -e OPENCODE_SERVER_1_NAME='Server 1' \
-  -e OPENCODE_SERVER_2_URL=https://opencode-api2.example.com \
-  -e OPENCODE_SERVER_2_NAME='Server 2' \
-  -e OPENCODE_FORCE_DEFAULT_SERVER=1 \
+  -e OPENCODE_SERVER_URL=https://opencode-api.example.com \
+  -e OPENCODE_SERVER_NAME='My Server' \
+  -e OPENCODE_APP_TITLE='Hosted OpenCode' \
   ghcr.io/djchen/opencode-web-docker:latest
 ```
 
@@ -41,54 +39,63 @@ docker run -d \
 
 All configuration is via environment variables, applied at container start.
 
+### Server
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENCODE_SERVER_1_URL` | **yes** | — | First configured backend URL |
-| `OPENCODE_SERVER_<N>_URL` | yes, for every configured index | — | Backend URL for server `N` |
-| `OPENCODE_SERVER_<N>_NAME` | no | — | Display name shown for server `N` in the UI |
-| `OPENCODE_SERVER_<N>_USERNAME` | no | — | HTTP basic-auth username for server `N`. Stored in browser localStorage |
-| `OPENCODE_SERVER_<N>_PASSWORD` | no | — | HTTP basic-auth password for server `N`. Stored in browser localStorage |
-| `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | `true` or unset forces server `1`; `false` preserves a valid browser default; integer `N` forces server `N` |
-| `OPENCODE_APP_TITLE` | no | — | Browser tab title to apply after runtime config loads |
+| `OPENCODE_SERVER_URL` | **yes** | — | Backend URL |
+| `OPENCODE_SERVER_NAME` | no | — | Display name shown in the UI |
+| `OPENCODE_SERVER_USERNAME` | no | — | HTTP basic-auth username. Stored in browser localStorage |
+| `OPENCODE_SERVER_PASSWORD` | no | — | HTTP basic-auth password. Stored in browser localStorage |
+| `OPENCODE_APP_TITLE` | no | — | Browser tab title |
 
 Rules:
 
-- Configured indexes must be contiguous unpadded integers starting at `1`. Valid examples: `1`; `1,2`; `1,2,3`. Invalid examples: `01`; `1,3`.
 - URLs are normalized by trimming whitespace, adding `http://` when missing, and removing trailing slashes.
-- `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`.
-- Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
+- Startup fails fast on missing or empty `OPENCODE_SERVER_URL`.
 - `OPENCODE_APP_TITLE`, when set, updates the browser tab title only. It does not change visible in-app branding.
+
+**IMPORTANT**: `OPENCODE_SERVER_USERNAME` and `OPENCODE_SERVER_PASSWORD` are written into browser localStorage at runtime. **Do not set these for public deployments.** Let users enter credentials in the app instead.
+
+### Settings Sync
+
+When `OPENCODE_SETTINGS_SYNC_URL` is set, the web app pulls and pushes a allowlist of settings (fonts, keybinds, theme, layout, locale) to an external HTTPS endpoint.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENCODE_SETTINGS_SYNC_URL` | no | — | Full URL for settings sync (empty = disabled) |
+| `OPENCODE_SETTINGS_SYNC_INTERVAL` | no | `30` | Pull interval in seconds (min 5) |
+| `OPENCODE_SETTINGS_SYNC_AUTH_HEADER` | no | — | Custom `Authorization` header value (e.g. `Bearer mytoken`) |
+| `OPENCODE_SETTINGS_SYNC_USERNAME` | no | — | Username for HTTP Basic Auth (only when AUTH_HEADER is not set) |
+| `OPENCODE_SETTINGS_SYNC_PASSWORD` | no | — | Password for HTTP Basic Auth (only when AUTH_HEADER is not set) |
+
+Synced keys: `settings.v3`, `opencode-theme-id`, `opencode-color-scheme`, `opencode.global.dat:language`, `opencode.global.dat:layout`, `opencode.global.dat:layout.page`.
+
+The sync URL is used as-is for both GET and PUT — no path segments are appended. The sync service must return `200` + JSON body on GET, and `200`/`204` on PUT. A `404` response on GET is treated as "no remote state yet" and triggers an initial push when local synced settings exist.
+
+If `OPENCODE_SETTINGS_SYNC_AUTH_HEADER` is set, its value is sent as the `Authorization` header on every sync request. Otherwise, HTTP Basic Auth is used with `OPENCODE_SETTINGS_SYNC_USERNAME` and `OPENCODE_SETTINGS_SYNC_PASSWORD`.
+
+**Note**: The sync service must return proper CORS headers allowing the web app's origin.
+
+**IMPORTANT**: `OPENCODE_SETTINGS_SYNC_AUTH_HEADER`, `OPENCODE_SETTINGS_SYNC_USERNAME`, and `OPENCODE_SETTINGS_SYNC_PASSWORD` are embedded in browser-delivered JavaScript. **Do not set `OPENCODE_SETTINGS_SYNC_AUTH_HEADER` to a shared secret or service token.** Only use per-user, browser-safe credentials.
 
 Example:
 
 ```yaml
-OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
-OPENCODE_SERVER_1_NAME: Server 1
-
-OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
-OPENCODE_SERVER_2_NAME: Server 2
-
-OPENCODE_FORCE_DEFAULT_SERVER: 1
+OPENCODE_SERVER_URL: https://opencode-api.example.com
+OPENCODE_SERVER_NAME: My Server
 OPENCODE_APP_TITLE: Hosted OpenCode
+OPENCODE_SETTINGS_SYNC_URL: https://api.example.com/v1/sync/users/opencode/settings
+OPENCODE_SETTINGS_SYNC_AUTH_HEADER: "Bearer my-token"
 ```
-
-**IMPORTANT**: `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written into browser localStorage at runtime. **Do not set these for public deployments.** Let users enter credentials in the app instead.
-
 
 ## How It Works
 
 1. **Build time** — The upstream OpenCode web app is built, then:
    - `build/prepare-static-web.mjs` injects `<script src="/runtime-config.js">` and a static `<link rel="stylesheet" href="/opencode-web-customizations.css">` into `index.html` (before the module bundle), patches the app's default server URL logic to respect the runtime config, writes the customization CSS from `build/customization-css.mjs` as a standalone asset, and patches only the JS assets referenced from `index.html` in place.
    - `build/check-runtime-config-compat.mjs` validates that the upstream source still matches the assumptions made by those build and runtime patches. The Docker build fails if they diverge, prompting you to update the affected build or runtime scripts.
-2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` from environment variables. This script writes all configured servers into browser localStorage before the app loads, keeps configured servers first in index order, preserves user-added non-configured servers, preserves `projects` and `lastProject`, avoids redundant localStorage rewrites when nothing changed, and removes `location.origin` when it would otherwise appear as a fake backend.
+2. **Run time** — `runtime/entrypoint.sh` (the container entrypoint) generates `/runtime-config.js` by concatenating a JS preamble (with env var assignments), `runtime/runtime-config-core.js`, and `runtime/sync-client.js`. The generated script is synchronous (no `await`) and runs as a blocking `<script>` before the app bundle. It writes the configured server into browser localStorage, removes `location.origin` when it would otherwise appear as a fake backend, avoids redundant writes, and sets `window.__OPENCODE_SERVER_URL`. If `OPENCODE_SETTINGS_SYNC_URL` is set, it also initializes the settings sync client.
 3. **Serving** — [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` sets aggressive no-cache headers on `/runtime-config.js` and `/index.html`.
-
-Default server behavior:
-
-- If `OPENCODE_FORCE_DEFAULT_SERVER` is unset or `true`, server `1` is selected on load.
-- If `OPENCODE_FORCE_DEFAULT_SERVER` is an integer `N`, server `N` is selected on load.
-- If `OPENCODE_FORCE_DEFAULT_SERVER=false`, the browser's existing default is preserved when it still points to a server in the merged list; otherwise the wrapper falls back to server `1`.
-- For configured servers already stored in the browser, non-empty env-provided `NAME`, `USERNAME`, and `PASSWORD` override stored values. Unset and empty values are treated the same, so stored optional metadata is preserved when the env omits a value or sets it to an empty string.
 
 ## Updating Upstream OpenCode
 
@@ -102,7 +109,7 @@ Default server behavior:
 
 Then rebuild the image (`docker build -t opencode-web-docker .`).
 
-If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update `runtime/entrypoint.sh`, `runtime/runtime-config-core.js`, or the other affected build scripts before rebuilding.
+If the compatibility check fails, upstream has changed in a way that's incompatible with the patches — update `runtime/entrypoint.sh`, `runtime/runtime-config-core.js`, or `runtime/sync-client.js` before rebuilding.
 
 Repository-owned verification:
 

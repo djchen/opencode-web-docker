@@ -57,7 +57,11 @@ export function runContracts(files, contracts) {
   })
 }
 
-export function formatFailures(failures) {
+export function formatFailures(failures, contracts = []) {
+  const hintsByArea = new Map(
+    contracts.filter((c) => c.hint).map((c) => [c.area, c.hint]),
+  )
+
   const grouped = new Map()
 
   for (const failure of failures) {
@@ -66,9 +70,14 @@ export function formatFailures(failures) {
     grouped.set(failure.area, list)
   }
 
-  return Array.from(grouped.entries()).flatMap(([area, messages]) => [
-    `[${area}]`,
-    ...messages.map((message) => `- ${message}`),
-    "",
-  ])
+  return Array.from(grouped.entries()).flatMap(([area, messages]) => {
+    const lines = [
+      `[${area}]`,
+      ...messages.map((message) => `- ${message}`),
+    ]
+    const hint = hintsByArea.get(area)
+    if (hint) lines.push(`  → ${hint}`)
+    lines.push("")
+    return lines
+  })
 }

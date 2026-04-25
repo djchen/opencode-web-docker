@@ -20,6 +20,7 @@ export const prepareStaticWebSources = {
 export const prepareStaticWebContracts = [
   {
     area: "server URL JS patch",
+    hint: "If getCurrentUrl() logic changed, update the JS patch in build/prepare-static-web.mjs and the contract; if only regex patterns shifted, update the contract.",
     checks: [
       match(
         "entry",
@@ -40,6 +41,7 @@ export const prepareStaticWebContracts = [
   },
   {
     area: "help-button CSS patch",
+    hint: "If sidebar-rail markup or data attributes changed, update the CSS selectors in build/prepare-static-web.mjs; if attributes were just renamed, update both the contract and the patch.",
     checks: [
       match(
         "sidebarShell",
@@ -65,6 +67,7 @@ export const prepareStaticWebContracts = [
   },
   {
     area: "mobile header CSS patch",
+    hint: "If layout markers or titlebar ids changed, update the CSS selectors in build/prepare-static-web.mjs; if markers were just renamed, update both the contract and the patch.",
     checks: [
       every(
         "layout",
@@ -95,6 +98,7 @@ export const prepareStaticWebContracts = [
   },
   {
     area: "status popover mobile CSS patch",
+    hint: "If popover data attributes or width classes changed, update the CSS selectors in build/prepare-static-web.mjs; if attributes were just renamed, update both the contract and the patch.",
     checks: [
       every(
         "statusPopover",
@@ -120,6 +124,7 @@ export const prepareStaticWebContracts = [
   },
   {
     area: "desktop and mobile footer CSS patch",
+    hint: "If prompt-input or dock-surface data attributes changed, update the CSS selectors in build/prepare-static-web.mjs; if attributes were just renamed, update both the contract and the patch.",
     checks: [
       every(
         "promptInput",
@@ -160,5 +165,3 @@ export const prepareStaticWebContracts = [
   },
 ]
 
-export const prepareStaticWebFailureHint =
-  "Review prepare-static-web.mjs before building a new image against this upstream revision."

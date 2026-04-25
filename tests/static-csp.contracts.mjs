@@ -80,6 +80,7 @@ export function matchesUpstreamStaticCsp(files) {
 export const staticCspContracts = [
   {
     area: "static-web CSP",
+    hint: "If upstream changed its DEFAULT_CSP directives, update config/sws.toml to match (plus the wrapper's additions); if the wrapper's extra directives changed intent, update the contract expectations.",
     checks: [
       {
         file: "staticWebConfig",
@@ -90,6 +91,3 @@ export const staticCspContracts = [
     ],
   },
 ]
-
-export const staticCspFailureHint =
-  "Review config/sws.toml against opencode/packages/opencode/src/server/routes/ui.ts before building a new image against this upstream revision."

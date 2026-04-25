@@ -12,7 +12,7 @@ RUN apt-get update \
     python3 \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /opt/opencode-web
 
 # Keep install inputs stable across ordinary source edits so bun install stays cached.
 COPY opencode/package.json opencode/bun.lock opencode/bunfig.toml ./opencode/
@@ -26,14 +26,17 @@ COPY opencode/packages/opencode/script/fix-node-pty.ts ./opencode/packages/openc
 RUN bun install --cwd opencode --frozen-lockfile
 
 COPY opencode ./opencode
-COPY config ./config
-COPY build/check-runtime-config-compat.mjs ./build/check-runtime-config-compat.mjs
+COPY package.json bun.lock tsconfig.json ./
+RUN bun install --frozen-lockfile
+COPY build ./build
+COPY runtime ./runtime
 COPY tests ./tests
-COPY build/customization-css.mjs ./build/customization-css.mjs
-COPY build/prepare-static-web.mjs ./build/prepare-static-web.mjs
-RUN bun ./build/check-runtime-config-compat.mjs
+COPY config ./config
+RUN bun ./build/check-runtime-config-compat.ts
+RUN bun run build:runtime
 RUN bun run --cwd opencode/packages/app build
-RUN bun ./build/prepare-static-web.mjs ./opencode/packages/app/dist
+RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
+RUN mkdir -p release/public release/runtime && cp -a config release/ && cp dist/runtime/runtime-bundle.js release/runtime/ && cp runtime/entrypoint.sh release/runtime/ && cp -a opencode/packages/app/dist/. release/public/
 
 FROM ghcr.io/static-web-server/static-web-server:2-alpine
 
@@ -48,15 +51,14 @@ LABEL org.opencontainers.image.version="$VERSION"
 LABEL org.opencontainers.image.revision="$REVISION"
 LABEL org.opencontainers.image.licenses="MIT"
 
-COPY --chown=sws:sws config/sws.toml /home/sws/sws.toml
-COPY --chown=sws:sws runtime/entrypoint.sh /usr/local/bin/runtime-config.sh
-COPY --chown=sws:sws runtime/runtime-config-core.js /usr/local/share/opencode-web/runtime-config-core.js
-COPY --chown=sws:sws --from=build /app/opencode/packages/app/dist/ /home/sws/public/
+WORKDIR /opt/opencode-web
 
-RUN chmod +x /usr/local/bin/runtime-config.sh
+COPY --chown=sws:sws --from=build /opt/opencode-web/release/ ./
+
+RUN chmod +x /opt/opencode-web/runtime/entrypoint.sh
 
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1/index.html || exit 1
 
-ENTRYPOINT ["/bin/sh", "/usr/local/bin/runtime-config.sh"]
-CMD ["static-web-server", "-w", "/home/sws/sws.toml"]
+ENTRYPOINT ["/bin/sh", "/opt/opencode-web/runtime/entrypoint.sh"]
+CMD ["static-web-server", "-w", "/opt/opencode-web/config/sws.toml"]

@@ -11,6 +11,7 @@ export const runtimeConfigSources = {
 export const runtimeConfigContracts = [
   {
     area: "runtime-config persistence",
+    hint: "If a localStorage key name or type shape changed, update runtime/runtime-config-core.js; if only the internal variable was renamed, update the contract regex.",
     checks: [
       match(
         "entry",
@@ -40,6 +41,3 @@ export const runtimeConfigContracts = [
     ],
   },
 ]
-
-export const runtimeConfigFailureHint =
-  "Review runtime/entrypoint.sh and runtime/runtime-config-core.js before building a new image against this upstream revision."

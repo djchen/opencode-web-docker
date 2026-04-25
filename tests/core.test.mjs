@@ -45,6 +45,33 @@ describe("runtime-config compatibility helpers", () => {
     ])
   })
 
+  test("formatFailures includes per-area hints from contracts", () => {
+    const contracts = [
+      { area: "patch A", hint: "Update patch A.", checks: [] },
+      { area: "patch B", hint: "Update patch B.", checks: [] },
+      { area: "patch C", checks: [] },
+    ]
+
+    const result = formatFailures(
+      [
+        { area: "patch A", message: "first failure" },
+        { area: "patch B", message: "second failure" },
+      ],
+      contracts,
+    )
+
+    expect(result).toEqual([
+      "[patch A]",
+      "- first failure",
+      "  → Update patch A.",
+      "",
+      "[patch B]",
+      "- second failure",
+      "  → Update patch B.",
+      "",
+    ])
+  })
+
   test("validateContracts rejects unknown source keys", () => {
     expect(() =>
       validateContracts(
