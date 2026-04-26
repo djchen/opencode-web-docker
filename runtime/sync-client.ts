@@ -68,7 +68,7 @@ function _applyRemoteBlob(
 }
 
 function _formatRelativeTime(ms: number | null): string {
-  if (!ms) return "never"
+  if (ms === null || ms === undefined) return "never"
   const diff = Math.floor((Date.now() - ms) / 1000)
   if (diff < 60) return "just now"
   if (diff < 3600) return Math.floor(diff / 60) + "m ago"

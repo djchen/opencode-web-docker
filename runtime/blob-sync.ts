@@ -189,6 +189,8 @@ export function createBlobSync(config: BlobSyncConfig): BlobSyncApi {
   }
 
   function stop(): void {
+    _paused = true
+    _isDirty = false
     if (_pullTimerId) {
       _clearInterval(_pullTimerId)
       _pullTimerId = null
