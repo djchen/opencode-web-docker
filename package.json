@@ -3,7 +3,7 @@
   "description": "OpenCode Web Docker",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.12",
+  "packageManager": "bun@1.3.13",
   "repository": {
     "type": "git",
     "url": "https://github.com/djchen/opencode-web-docker.git"
@@ -15,6 +15,22 @@
   "scripts": {
     "test:build-compat": "bun test tests",
     "docker:build": "docker build -t opencode-web-docker .",
-    "upstream:update": "./scripts/update-opencode-release.sh"
+    "upstream:update": "./scripts/update-opencode-release.sh",
+    "typecheck": "tsc --noEmit",
+    "build:runtime": "bun run build/transpile-runtime.ts",
+    "lint": "oxlint build/ runtime/ tests/",
+    "format": "prettier --write build/ runtime/ tests/",
+    "format:check": "prettier --check build/ runtime/ tests/"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "^1.0.0",
+    "@types/bun": "1.3.13",
+    "oxlint": "^1.0.0",
+    "prettier": "3.6.2",
+    "typescript": "^5.8.0"
+  },
+  "prettier": {
+    "semi": false,
+    "printWidth": 120
   }
 }
