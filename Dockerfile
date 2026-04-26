@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3.12 AS build
+FROM oven/bun:1.3.13 AS build
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
