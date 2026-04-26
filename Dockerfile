@@ -8,7 +8,6 @@ RUN apt-get update \
     g++ \
     git \
     make \
-    pkg-config \
     python3 \
   && rm -rf /var/lib/apt/lists/*
 
@@ -17,7 +16,6 @@ WORKDIR /opt/opencode-web
 # Keep install inputs stable across ordinary source edits so bun install stays cached.
 COPY opencode/package.json opencode/bun.lock opencode/bunfig.toml ./opencode/
 COPY opencode/patches ./opencode/patches
-COPY opencode/.husky ./opencode/.husky
 COPY --parents \
   opencode/./packages/**/package.json \
   ./opencode/
@@ -28,15 +26,16 @@ RUN bun install --cwd opencode --frozen-lockfile
 COPY opencode ./opencode
 COPY package.json bun.lock tsconfig.json ./
 RUN bun install --frozen-lockfile
-COPY build ./build
-COPY runtime ./runtime
-COPY tests ./tests
-COPY config ./config
+COPY build runtime tests config ./
 RUN bun ./build/check-runtime-config-compat.ts
 RUN bun run build:runtime
 RUN bun run --cwd opencode/packages/app build
 RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
-RUN mkdir -p release/public release/runtime && cp -a config release/ && cp dist/runtime/runtime-bundle.js release/runtime/ && cp runtime/entrypoint.sh release/runtime/ && cp -a opencode/packages/app/dist/. release/public/
+RUN mkdir -p release/public release/runtime \
+ && cp -r config/ release/config/ \
+ && cp dist/runtime/runtime-bundle.js release/runtime/ \
+ && cp runtime/entrypoint.sh release/runtime/ \
+ && cp -r opencode/packages/app/dist/. release/public/
 
 FROM ghcr.io/static-web-server/static-web-server:2-alpine
 
@@ -54,8 +53,6 @@ LABEL org.opencontainers.image.licenses="MIT"
 WORKDIR /opt/opencode-web
 
 COPY --chown=sws:sws --from=build /opt/opencode-web/release/ ./
-
-RUN chmod +x /opt/opencode-web/runtime/entrypoint.sh
 
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1/index.html || exit 1

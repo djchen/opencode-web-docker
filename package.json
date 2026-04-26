@@ -3,7 +3,7 @@
   "description": "OpenCode Web Docker",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.12",
+  "packageManager": "bun@1.3.13",
   "repository": {
     "type": "git",
     "url": "https://github.com/djchen/opencode-web-docker.git"
