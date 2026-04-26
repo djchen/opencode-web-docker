@@ -68,6 +68,7 @@ export interface SyncClientDeps {
   window: Window & typeof globalThis
   MutationObserver: typeof globalThis.MutationObserver
   console: Pick<typeof globalThis.console, "warn" | "log">
+  dateNow?: () => number
 }
 
 export interface RuntimeConfigDeps {

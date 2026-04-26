@@ -67,9 +67,9 @@ function _applyRemoteBlob(
   }
 }
 
-function _formatRelativeTime(ms: number | null): string {
+function _formatRelativeTime(ms: number | null, dateNow: () => number = Date.now): string {
   if (ms === null || ms === undefined) return "never"
-  const diff = Math.floor((Date.now() - ms) / 1000)
+  const diff = Math.floor((dateNow() - ms) / 1000)
   if (diff < 60) return "just now"
   if (diff < 3600) return Math.floor(diff / 60) + "m ago"
   if (diff < 86400) return Math.floor(diff / 3600) + "h ago"
@@ -79,10 +79,11 @@ function _formatRelativeTime(ms: number | null): string {
 function _createSyncPanel(
   deps: SyncClientDeps,
   syncUrl: string,
-  resolveFirstSync: ((choice: string) => void) | null,
+  resolveFirstSyncRef: { value: ((choice: string) => void) | null },
   sync: BlobSyncApi | null,
   origSetItem: Storage["setItem"] | null,
   origRemoveItem: Storage["removeItem"] | null,
+  dateNow: () => number,
 ): HTMLDivElement & { _refreshPanel?: () => void } {
   const statusInfo = deps.window.__OPENCODE_SYNC_STATUS as SyncStatusInfo | null | undefined
   const status: SyncStatus = statusInfo ? statusInfo.status : "idle"
@@ -126,7 +127,8 @@ function _createSyncPanel(
     useServerBtn.textContent = "Use server settings"
     useServerBtn.onclick = (e: MouseEvent) => {
       e.stopPropagation()
-      if (resolveFirstSync) resolveFirstSync("server")
+      const resolve = resolveFirstSyncRef.value
+      if (resolve) resolve("server")
     }
     panel.appendChild(useServerBtn)
 
@@ -143,7 +145,7 @@ function _createSyncPanel(
       if (existingPanel) existingPanel.remove()
       const wrapper = deps.document.querySelector('[data-component="opencode-web-sync-btn"]')
       if (wrapper && wrapper.parentNode) {
-        wrapper.parentNode.appendChild(_createSyncPanel(deps, syncUrl, null, sync, origSetItem, origRemoveItem))
+        wrapper.parentNode.appendChild(_createSyncPanel(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow))
       }
     }
     panel.appendChild(dontSyncBtn)
@@ -162,7 +164,7 @@ function _createSyncPanel(
     const timeRow = deps.document.createElement("div")
     timeRow.id = "opencode-web-sync-time"
     timeRow.setAttribute("data-component", "sync-time-row")
-    timeRow.textContent = "Last checked: " + _formatRelativeTime(lastSync)
+    timeRow.textContent = "Last checked: " + _formatRelativeTime(lastSync, dateNow)
     panel.appendChild(timeRow)
 
     const syncBtn = deps.document.createElement("button")
@@ -198,7 +200,7 @@ function _createSyncPanel(
         const wrapper = deps.document.querySelector('[data-component="opencode-web-sync-btn"]')
         if (wrapper && wrapper.parentNode) {
           wrapper.parentNode.appendChild(
-            _createSyncPanel(deps, syncUrl, resolveFirstSync, sync, origSetItem, origRemoveItem),
+            _createSyncPanel(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow),
           )
         }
       }
@@ -211,7 +213,7 @@ function _createSyncPanel(
     }
     const timeEl = panel.querySelector('[data-component="sync-time-row"]')
     if (timeEl) {
-      timeEl.textContent = "Last checked: " + _formatRelativeTime(currentLastSync)
+      timeEl.textContent = "Last checked: " + _formatRelativeTime(currentLastSync, dateNow)
     }
   }
 
@@ -222,10 +224,11 @@ function _createSyncPanel(
 function _togglePanel(
   deps: SyncClientDeps,
   syncUrl: string,
-  resolveFirstSync: ((choice: string) => void) | null,
+  resolveFirstSyncRef: { value: ((choice: string) => void) | null },
   sync: BlobSyncApi | null,
   origSetItem: Storage["setItem"] | null,
   origRemoveItem: Storage["removeItem"] | null,
+  dateNow: () => number,
   wrapper: HTMLElement,
 ): void {
   const existing = wrapper.querySelector('[data-component="opencode-web-sync-panel"]')
@@ -234,7 +237,7 @@ function _togglePanel(
     return
   }
 
-  const panel = _createSyncPanel(deps, syncUrl, resolveFirstSync, sync, origSetItem, origRemoveItem)
+  const panel = _createSyncPanel(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow)
   wrapper.appendChild(panel)
 
   const intervalId = deps.setInterval(() => {
@@ -258,10 +261,11 @@ function _togglePanel(
 function _createSyncButton(
   deps: SyncClientDeps,
   syncUrl: string,
-  resolveFirstSync: ((choice: string) => void) | null,
+  resolveFirstSyncRef: { value: ((choice: string) => void) | null },
   sync: BlobSyncApi | null,
   origSetItem: Storage["setItem"] | null,
   origRemoveItem: Storage["removeItem"] | null,
+  dateNow: () => number,
 ): HTMLElement {
   const wrapper = deps.document.createElement("div")
   wrapper.setAttribute("data-component", "tooltip-trigger")
@@ -278,7 +282,7 @@ function _createSyncButton(
 
   btn.onclick = (e: MouseEvent) => {
     e.stopPropagation()
-    _togglePanel(deps, syncUrl, resolveFirstSync, sync, origSetItem, origRemoveItem, wrapper)
+    _togglePanel(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow, wrapper)
   }
 
   wrapper.appendChild(btn)
@@ -288,10 +292,11 @@ function _createSyncButton(
 function _injectSyncButton(
   deps: SyncClientDeps,
   syncUrl: string,
-  resolveFirstSync: ((choice: string) => void) | null,
+  resolveFirstSyncRef: { value: ((choice: string) => void) | null },
   sync: BlobSyncApi | null,
   origSetItem: Storage["setItem"] | null,
   origRemoveItem: Storage["removeItem"] | null,
+  dateNow: () => number,
 ): void {
   const observer = new deps.MutationObserver(() => {
     const rail = deps.document.querySelector('[data-component="sidebar-rail"]')
@@ -309,7 +314,7 @@ function _injectSyncButton(
       const trigger = settingsBtn.closest('[data-component="tooltip-trigger"]')
       if (trigger && trigger.parentNode) {
         trigger.parentNode.insertBefore(
-          _createSyncButton(deps, syncUrl, resolveFirstSync, sync, origSetItem, origRemoveItem),
+          _createSyncButton(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow),
           trigger,
         )
         return
@@ -317,7 +322,7 @@ function _injectSyncButton(
     }
 
     bottom.insertBefore(
-      _createSyncButton(deps, syncUrl, resolveFirstSync, sync, origSetItem, origRemoveItem),
+      _createSyncButton(deps, syncUrl, resolveFirstSyncRef, sync, origSetItem, origRemoveItem, dateNow),
       bottom.firstChild,
     )
   })
@@ -363,7 +368,8 @@ export function initSettingsSync(
   const _syncUrl = url
   const _syncAuthHeader = _buildAuthHeader(authHeader ?? "", username ?? "", password ?? "")
   const _syncIntervalMs = Math.max(5, parseInt(intervalSec ?? "30", 10) || 30) * 1000
-  let _resolveFirstSync: ((choice: string) => void) | null = null
+  const _resolveFirstSyncRef = { value: null as ((choice: string) => void) | null }
+  const _dateNow = deps?.dateNow ?? Date.now
 
   const declined = d.localStorage.getItem("opencode-sync-declined")
   if (declined) {
@@ -372,7 +378,7 @@ export function initSettingsSync(
       lastSync: null,
       url: _syncUrl,
     } satisfies SyncStatusInfo
-    _injectSyncButton(d, _syncUrl, null, null, null, null)
+    _injectSyncButton(d, _syncUrl, _resolveFirstSyncRef, null, null, null, _dateNow)
     return
   }
 
@@ -432,12 +438,16 @@ export function initSettingsSync(
       if (status === "connected") {
         d.localStorage.setItem("opencode-sync-last-success", String(ts))
       }
+      if (status === "disabled" && _origSetItem && _origRemoveItem) {
+        d.localStorage.setItem = _origSetItem
+        d.localStorage.removeItem = _origRemoveItem
+      }
       const panel = d.document.querySelector('[data-component="opencode-web-sync-panel"]')
       if (panel && (panel as HTMLDivElement & { _refreshPanel?: () => void })._refreshPanel)
         (panel as HTMLDivElement & { _refreshPanel?: () => void })._refreshPanel!()
     },
     onFirstSyncDivergence: (local, remote, resolve) => {
-      _resolveFirstSync = resolve
+      _resolveFirstSyncRef.value = resolve
       const panel = d.document.querySelector('[data-component="opencode-web-sync-panel"]')
       if (panel) {
         panel.remove()
@@ -446,7 +456,7 @@ export function initSettingsSync(
       if (wrapper) {
         const parent = wrapper.parentNode
         if (parent) {
-          const newPanel = _createSyncPanel(d, _syncUrl, _resolveFirstSync, _sync, _origSetItem, _origRemoveItem)
+          const newPanel = _createSyncPanel(d, _syncUrl, _resolveFirstSyncRef, _sync, _origSetItem, _origRemoveItem, _dateNow)
           parent.appendChild(newPanel)
         }
       }
@@ -485,7 +495,7 @@ export function initSettingsSync(
     }
   })
 
-  _injectSyncButton(d, _syncUrl, _resolveFirstSync, _sync, _origSetItem, _origRemoveItem)
+  _injectSyncButton(d, _syncUrl, _resolveFirstSyncRef, _sync, _origSetItem, _origRemoveItem, _dateNow)
 }
 
 export {
