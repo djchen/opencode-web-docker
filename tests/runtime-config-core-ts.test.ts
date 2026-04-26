@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { initRuntimeConfig, defaultServerUrlKey, serverStoreKey } from "../runtime/runtime-config-core"
+import { initRuntimeConfig } from "../runtime/runtime-config-core"
 import type { RuntimeConfigDeps } from "../runtime/types"
 
 const encodeBase64 = (value: string): string => Buffer.from(value, "utf8").toString("base64")

@@ -26,7 +26,10 @@ RUN bun install --cwd opencode --frozen-lockfile
 COPY opencode ./opencode
 COPY package.json bun.lock tsconfig.json ./
 RUN bun install --frozen-lockfile
-COPY build runtime tests config ./
+COPY build ./build/
+COPY runtime ./runtime/
+COPY tests ./tests/
+COPY config ./config/
 RUN bun ./build/check-runtime-config-compat.ts
 RUN bun run build:runtime
 RUN bun run --cwd opencode/packages/app build
