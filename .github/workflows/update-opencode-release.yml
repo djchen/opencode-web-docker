@@ -17,6 +17,7 @@ permissions:
 jobs:
   update-opencode:
     runs-on: ubuntu-latest
+    environment: automation
 
     steps:
       - name: Check out repository

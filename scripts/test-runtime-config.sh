@@ -72,7 +72,7 @@ expect_generated_runtime_config_parses() {
 
   printf '==> %s\n' "$name"
   runtime_config_js="$("$@")"
-  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function(source)});'
+  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function("return(async()=>{"+source+"})")});'
 }
 
 expect_failure \
@@ -134,7 +134,7 @@ expect_success \
     -e OPENCODE_SERVER_1_URL=http://api1.example.com \
     -e "UNRELATED_MULTILINE=$multiline_env_value" \
     "$image_tag" \
-    sh -lc 'test -s /home/sws/public/runtime-config.js'
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js'
 
 expect_success \
   "generate a valid multi-backend runtime payload" \
@@ -145,7 +145,7 @@ expect_success \
     -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
     -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /home/sws/public/runtime-config.js && test -s /home/sws/public/opencode-web-customizations.css && grep -F "var configuredDefaultIndex = 2" /home/sws/public/runtime-config.js >/dev/null && grep -F "var forceDefaultMode = \"force\"" /home/sws/public/runtime-config.js >/dev/null && grep -F "window.__OPENCODE_SERVER_URL = bootstrapUrl" /home/sws/public/runtime-config.js >/dev/null && grep -F "var bootstrapUrl = mergedConfigured[0].http.url" /home/sws/public/runtime-config.js >/dev/null && grep -F "var appTitle = \"SG9zdGVkIE9wZW5Db2Rl\"" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "window.__OPENCODE_SERVER_URL = effectiveDefaultUrl" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "index:" /home/sws/public/runtime-config.js >/dev/null && ! grep -F "<style id=\"opencode-web-customizations\"" /home/sws/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /home/sws/public/index.html >/dev/null'
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && test -s /opt/opencode-web/public/opencode-web-customizations.css && grep -F "var configuredDefaultIndex = 2" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "var forceDefaultMode = \"force\"" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "window.__OPENCODE_SERVER_URL = bootstrapUrl" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "var bootstrapUrl = mergedConfigured[0].http.url" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "var appTitle = \"SG9zdGVkIE9wZW5Db2Rl\"" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "window.__OPENCODE_SERVER_URL = effectiveDefaultUrl" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "index:" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "<style id=\"opencode-web-customizations\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /opt/opencode-web/public/index.html >/dev/null'
 
 expect_generated_runtime_config_parses \
   "generated runtime-config.js parses as JavaScript" \
@@ -156,6 +156,6 @@ expect_generated_runtime_config_parses \
     -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
     -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /home/sws/public/runtime-config.js && cat /home/sws/public/runtime-config.js'
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
 
 printf '==> All runtime-config regression checks passed\n'
