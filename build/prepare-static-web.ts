@@ -5,8 +5,10 @@ import { customizationCss } from "./customization-css"
 export const runtimeTag = '    <script src="/runtime-config.js"></script>\n'
 export const customizationCssFileName = "opencode-web-customizations.css"
 export const customizationTag = `    <link rel="stylesheet" href="/${customizationCssFileName}">\n`
-export const serverUrlPattern = /((?:window\.)?location\.hostname\.includes\("opencode\.ai"\)\s*\?\s*"[^"]+"\s*:)\s*((?:window\.)?location\.origin)/g
-export const referencedJsPattern = /<(?:script|link)\b[^>]+(?:src|href)=["']([^"']+\.js(?:\?[^"'#]*)?(?:#[^"']*)?)["'][^>]*>/g
+export const serverUrlPattern =
+  /((?:window\.)?location\.hostname\.includes\("opencode\.ai"\)\s*\?\s*"[^"]+"\s*:)\s*((?:window\.)?location\.origin)/g
+export const referencedJsPattern =
+  /<(?:script|link)\b[^>]+(?:src|href)=["']([^"']+\.js(?:\?[^"'#]*)?(?:#[^"']*)?)["'][^>]*>/g
 export const serverUrlPatchedMarkers = [
   "window.__OPENCODE_SERVER_URL||location.origin",
   "window.__OPENCODE_SERVER_URL||window.location.origin",

@@ -15,6 +15,7 @@
 - Quick upstream app build check: `bun run --cwd opencode/packages/app build`
 - Build runtime bundle: `bun run build:runtime`
 - TypeScript typecheck: `bun run typecheck`
+- Lint (oxlint): `bun run lint`
 - Bump upstream submodule to a release tag: `./scripts/update-opencode-release.sh [tag]` (or `bun run upstream:update` for latest)
 
 **Root CI**

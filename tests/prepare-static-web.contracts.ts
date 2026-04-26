@@ -26,12 +26,12 @@ export const prepareStaticWebContracts: Contract[] = [
       match(
         "entry",
         /(?:window\.)?location\.hostname\.includes\("opencode\.ai"\)/,
-        'expected app getCurrentUrl to keep the opencode.ai hostname check (used by prepare-static-web.ts JS patch)',
+        "expected app getCurrentUrl to keep the opencode.ai hostname check (used by prepare-static-web.ts JS patch)",
       ),
       match(
         "entry",
         /return "http:\/\/localhost:4096"/,
-        'expected app getCurrentUrl to keep returning the localhost bootstrap URL literal (used by prepare-static-web.ts JS patch)',
+        "expected app getCurrentUrl to keep returning the localhost bootstrap URL literal (used by prepare-static-web.ts JS patch)",
       ),
       match(
         "entry",
@@ -73,22 +73,27 @@ export const prepareStaticWebContracts: Contract[] = [
       every(
         "layout",
         [/fixed inset-x-0 top-10 bottom-0 z-40/, /data-component="sidebar-nav-mobile"/, /fixed top-10 bottom-0/],
-        'expected mobile sidebar overlay/nav to keep the fixed top-10 layout markers used by prepare-static-web.ts mobile header CSS',
+        "expected mobile sidebar overlay/nav to keep the fixed top-10 layout markers used by prepare-static-web.ts mobile header CSS",
       ),
       every(
         "titlebar",
-        [/<header[\s\S]*data-tauri-drag-region/, /id="opencode-titlebar-center"/, /id="opencode-titlebar-left"/, /id="opencode-titlebar-right"/],
-        'expected titlebar header to keep data-tauri-drag-region and the opencode titlebar mount ids (used by prepare-static-web.ts mobile header CSS)',
+        [
+          /<header[\s\S]*data-tauri-drag-region/,
+          /id="opencode-titlebar-center"/,
+          /id="opencode-titlebar-left"/,
+          /id="opencode-titlebar-right"/,
+        ],
+        "expected titlebar header to keep data-tauri-drag-region and the opencode titlebar mount ids (used by prepare-static-web.ts mobile header CSS)",
       ),
       match(
         "titlebar",
         /class="titlebar-icon/,
-        'expected titlebar controls to keep the titlebar-icon class (used by prepare-static-web.ts mobile header CSS)',
+        "expected titlebar controls to keep the titlebar-icon class (used by prepare-static-web.ts mobile header CSS)",
       ),
       match(
         "messageTimeline",
         /data-session-title/,
-        'expected session timeline to keep data-session-title on the sticky session heading (used by prepare-static-web.ts mobile header CSS)',
+        "expected session timeline to keep data-session-title on the sticky session heading (used by prepare-static-web.ts mobile header CSS)",
       ),
       every(
         "tabs",
@@ -104,7 +109,7 @@ export const prepareStaticWebContracts: Contract[] = [
       every(
         "statusPopover",
         [/w-\[360px\]/, /max-w-\[calc\(100vw-40px\)\]/],
-        'expected status popover content to keep its 360px width markers (used by prepare-static-web.ts mobile popover CSS)',
+        "expected status popover content to keep its 360px width markers (used by prepare-static-web.ts mobile popover CSS)",
       ),
       match(
         "popover",
@@ -119,7 +124,7 @@ export const prepareStaticWebContracts: Contract[] = [
       match(
         "statusPopoverBody",
         /w-\[360px\]/,
-        'expected status popover body to keep its 360px inner width marker (used by prepare-static-web.ts mobile popover CSS)',
+        "expected status popover body to keep its 360px inner width marker (used by prepare-static-web.ts mobile popover CSS)",
       ),
     ],
   },
@@ -145,7 +150,7 @@ export const prepareStaticWebContracts: Contract[] = [
           /text-13-medium/,
           /text-13-regular/,
         ],
-        'expected prompt footer controls to keep the prompt markers and utility classes used by prepare-static-web.ts footer CSS',
+        "expected prompt footer controls to keep the prompt markers and utility classes used by prepare-static-web.ts footer CSS",
       ),
       every(
         "dockSurface",

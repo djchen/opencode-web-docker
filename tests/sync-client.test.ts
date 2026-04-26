@@ -1,15 +1,19 @@
 import { describe, expect, test, afterEach } from "bun:test"
-import { initSettingsSync, SYNC_ALLOWLIST, _isAllowlisted, _base64Utf8, _formatRelativeTime, _readLocalBlob, _applyRemoteBlob, _resetSyncInitialized } from "../runtime/sync-client"
-import type { SyncClientDeps, SyncStatus, SyncStatusInfo } from "../runtime/types"
-import { createBlobSync } from "../runtime/blob-sync"
+import { initSettingsSync, _applyRemoteBlob, _resetSyncInitialized } from "../runtime/sync-client"
+import type { SyncClientDeps, SyncStatusInfo } from "../runtime/types"
 import { MockStorage } from "./helpers/mock-storage"
 
-interface MockFetchCall { url: string; opts: RequestInit }
+interface MockFetchCall {
+  url: string
+  opts: RequestInit
+}
 
-function createMockFetch(responses: {
-  getResponse?: { ok: boolean; status: number; json?: () => Promise<Record<string, unknown>> }
-  putResponse?: { ok: boolean; status: number }
-} = {}) {
+function createMockFetch(
+  responses: {
+    getResponse?: { ok: boolean; status: number; json?: () => Promise<Record<string, unknown>> }
+    putResponse?: { ok: boolean; status: number }
+  } = {},
+) {
   const calls: MockFetchCall[] = []
   const fetchImpl = (url: string, opts: RequestInit) => {
     calls.push({ url, opts })
@@ -21,10 +25,12 @@ function createMockFetch(responses: {
     if (responses.getResponse) {
       const r = responses.getResponse
       if (r.json) {
-        return Promise.resolve(new Response(null, {
-          status: r.status,
-          headers: { "Content-Type": "application/json" },
-        }))
+        return Promise.resolve(
+          new Response(null, {
+            status: r.status,
+            headers: { "Content-Type": "application/json" },
+          }),
+        )
       }
       return Promise.resolve(new Response(null, { status: r.status }))
     }
@@ -75,7 +81,9 @@ function runSyncClient(input: {
     title: "OpenCode",
     readyState: "complete" as const,
     hidden: false,
-    addEventListener: (event: string, handler: () => void) => { eventListeners[event] = handler },
+    addEventListener: (event: string, handler: () => void) => {
+      eventListeners[event] = handler
+    },
     removeEventListener: (_event: string, _handler: () => void) => {},
     getElementById: () => null as HTMLElement | null,
     querySelector: () => null as HTMLElement | null,
@@ -90,10 +98,20 @@ function runSyncClient(input: {
         style: { cssText: "" },
         _refreshPanel: undefined as (() => void) | undefined,
         parent: null,
-        setAttribute(key: string, value: string) { el.attributes[key] = value },
-        appendChild(child: any) { el.children.push(child); child.parent = el },
+        setAttribute(key: string, value: string) {
+          el.attributes[key] = value
+        },
+        appendChild(child: any) {
+          el.children.push(child)
+          child.parent = el
+        },
         contains: () => false,
-        remove() { if (el.parent) { el.parent.children = el.parent.children.filter((c: any) => c !== el); el.parent = null } },
+        remove() {
+          if (el.parent) {
+            el.parent.children = el.parent.children.filter((c: any) => c !== el)
+            el.parent = null
+          }
+        },
         querySelector: () => null as HTMLElement | null,
       }
       createdElements.push(el)
@@ -109,11 +127,20 @@ function runSyncClient(input: {
     location: mockLocation,
     localStorage: localStorage as Storage,
     fetch: mockFetch.fetchImpl,
-    setTimeout: (fn: () => void, ms: number) => { timers.push({ fn, ms }); return timers.length },
+    setTimeout: (fn: () => void, ms: number) => {
+      timers.push({ fn, ms })
+      return timers.length
+    },
     clearTimeout: () => {},
-    setInterval: (fn: () => void, ms: number) => { intervals.push({ fn, ms }); return intervals.length },
+    setInterval: (fn: () => void, ms: number) => {
+      intervals.push({ fn, ms })
+      return intervals.length
+    },
     clearInterval: () => {},
-    MutationObserver: class { observe() {} disconnect() {} },
+    MutationObserver: class {
+      observe() {}
+      disconnect() {}
+    },
   }
 
   const deps: SyncClientDeps = {
@@ -150,18 +177,6 @@ function runSyncClient(input: {
     document: mockDocument,
     deps,
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findButtonInPanel(panel: any, textContent: string): any {
-  if (!panel || !panel.children) return null
-  for (const child of panel.children) {
-    const el = child
-    if (el.textContent === textContent && el.onclick) return el
-    const found = findButtonInPanel(el, textContent)
-    if (found) return found
-  }
-  return null
 }
 
 describe("sync-client", () => {
@@ -311,7 +326,13 @@ describe("sync-client", () => {
     storage.setCalls.length = 0
 
     let reloadCalled = false
-    const mockLocation = { href: "http://localhost/", origin: "http://localhost", reload: () => { reloadCalled = true } }
+    const mockLocation = {
+      href: "http://localhost/",
+      origin: "http://localhost",
+      reload: () => {
+        reloadCalled = true
+      },
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockWindow: any = {
@@ -333,8 +354,13 @@ describe("sync-client", () => {
             id: "",
             style: { cssText: "" },
             parent: null,
-            setAttribute(key: string, value: string) { el.attributes[key] = value },
-            appendChild(child: any) { el.children.push(child); child.parent = el },
+            setAttribute(key: string, value: string) {
+              el.attributes[key] = value
+            },
+            appendChild(child: any) {
+              el.children.push(child)
+              child.parent = el
+            },
             contains: () => false,
             remove() {},
             querySelector: () => null,
@@ -349,7 +375,10 @@ describe("sync-client", () => {
       clearTimeout: () => {},
       setInterval: () => 1,
       clearInterval: () => {},
-      MutationObserver: class { observe() {} disconnect() {} },
+      MutationObserver: class {
+        observe() {}
+        disconnect() {}
+      },
     }
 
     const deps: SyncClientDeps = {

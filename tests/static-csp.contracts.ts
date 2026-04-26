@@ -1,4 +1,3 @@
-import { every, match } from "./core"
 import type { Contract } from "./core"
 
 const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/
@@ -61,7 +60,10 @@ export function buildExpectedStaticWebCsp(upstreamDefaultCsp: string): Map<strin
 }
 
 function sameValues(actual: string[], expected: string[]): boolean {
-  return actual.length === expected.length && [...actual].sort().every((value, index) => value === [...expected].sort()[index])
+  return (
+    actual.length === expected.length &&
+    [...actual].sort().every((value, index) => value === [...expected].sort()[index])
+  )
 }
 
 export function sameCsp(actual: Map<string, string[]>, expected: Map<string, string[]>): boolean {

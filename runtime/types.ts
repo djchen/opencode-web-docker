@@ -1,11 +1,4 @@
-export type SyncStatus =
-  | "idle"
-  | "connected"
-  | "error"
-  | "pushing"
-  | "pulling"
-  | "first-sync-pending"
-  | "disabled"
+export type SyncStatus = "idle" | "connected" | "error" | "pushing" | "pulling" | "first-sync-pending" | "disabled"
 
 export interface SyncStatusInfo {
   status: SyncStatus
@@ -84,4 +77,3 @@ export interface RuntimeConfigDeps {
   window: Window & typeof globalThis
   console: Pick<typeof globalThis.console, "warn" | "log">
 }
-

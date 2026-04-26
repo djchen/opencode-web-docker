@@ -24,11 +24,7 @@ function _base64Utf8(value: string): string {
   return btoa(unescape(encodeURIComponent(value)))
 }
 
-function _buildAuthHeader(
-  authHeaderValue: string,
-  username: string,
-  password: string,
-): Record<string, string> {
+function _buildAuthHeader(authHeaderValue: string, username: string, password: string): Record<string, string> {
   if (authHeaderValue) return { Authorization: authHeaderValue }
   if (username || password) {
     return { Authorization: "Basic " + _base64Utf8(username + ":" + password) }
@@ -36,9 +32,7 @@ function _buildAuthHeader(
   return {}
 }
 
-function _readLocalBlob(
-  localStorage: Storage,
-): Record<string, string | null> {
+function _readLocalBlob(localStorage: Storage): Record<string, string | null> {
   const blob: Record<string, string | null> = {}
   for (const key of SYNC_ALLOWLIST) {
     const value = localStorage.getItem(key)
@@ -113,13 +107,7 @@ function _createSyncPanel(
   } else if (status === "disabled") {
     label.textContent = "Sync disabled"
   } else {
-    label.textContent =
-      "Sync " +
-      (status === "connected"
-        ? "ok"
-        : status === "error"
-          ? "error"
-          : status || "idle")
+    label.textContent = "Sync " + (status === "connected" ? "ok" : status === "error" ? "error" : status || "idle")
   }
 
   statusRow.appendChild(dot)
@@ -155,9 +143,7 @@ function _createSyncPanel(
       if (existingPanel) existingPanel.remove()
       const wrapper = deps.document.querySelector('[data-component="opencode-web-sync-btn"]')
       if (wrapper && wrapper.parentNode) {
-        wrapper.parentNode.appendChild(
-          _createSyncPanel(deps, syncUrl, null, sync, origSetItem, origRemoveItem),
-        )
+        wrapper.parentNode.appendChild(_createSyncPanel(deps, syncUrl, null, sync, origSetItem, origRemoveItem))
       }
     }
     panel.appendChild(dontSyncBtn)
@@ -221,12 +207,7 @@ function _createSyncPanel(
     panel.setAttribute("data-status", currentStatus)
     if (label) {
       label.textContent =
-        "Sync " +
-        (currentStatus === "connected"
-          ? "ok"
-          : currentStatus === "error"
-            ? "error"
-            : currentStatus || "idle")
+        "Sync " + (currentStatus === "connected" ? "ok" : currentStatus === "error" ? "error" : currentStatus || "idle")
     }
     const timeEl = panel.querySelector('[data-component="sync-time-row"]')
     if (timeEl) {
@@ -465,14 +446,7 @@ export function initSettingsSync(
       if (wrapper) {
         const parent = wrapper.parentNode
         if (parent) {
-          const newPanel = _createSyncPanel(
-            d,
-            _syncUrl,
-            _resolveFirstSync,
-            _sync,
-            _origSetItem,
-            _origRemoveItem,
-          )
+          const newPanel = _createSyncPanel(d, _syncUrl, _resolveFirstSync, _sync, _origSetItem, _origRemoveItem)
           parent.appendChild(newPanel)
         }
       }
@@ -514,4 +488,12 @@ export function initSettingsSync(
   _injectSyncButton(d, _syncUrl, _resolveFirstSync, _sync, _origSetItem, _origRemoveItem)
 }
 
-export { SYNC_ALLOWLIST, _isAllowlisted, _buildAuthHeader, _base64Utf8, _formatRelativeTime, _readLocalBlob, _applyRemoteBlob }
+export {
+  SYNC_ALLOWLIST,
+  _isAllowlisted,
+  _buildAuthHeader,
+  _base64Utf8,
+  _formatRelativeTime,
+  _readLocalBlob,
+  _applyRemoteBlob,
+}

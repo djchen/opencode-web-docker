@@ -50,14 +50,16 @@ export function validateContracts(sources: Sources, contracts: Contract[]): void
   if (!unknown.length) return
 
   throw new Error(
-    [
-      "Invalid compatibility contracts.",
-      ...unknown.map((entry) => `- unknown source key in contract: ${entry}`),
-    ].join("\n"),
+    ["Invalid compatibility contracts.", ...unknown.map((entry) => `- unknown source key in contract: ${entry}`)].join(
+      "\n",
+    ),
   )
 }
 
-export function runContracts(files: Record<string, string>, contracts: Contract[]): { area: string; message: string }[] {
+export function runContracts(
+  files: Record<string, string>,
+  contracts: Contract[],
+): { area: string; message: string }[] {
   return contracts.flatMap((contract) => {
     const failures = contract.checks
       .filter((check) => !check.test(files))
@@ -72,9 +74,7 @@ export function runContracts(files: Record<string, string>, contracts: Contract[
 }
 
 export function formatFailures(failures: { area: string; message: string }[], contracts: Contract[] = []): string[] {
-  const hintsByArea = new Map<string, string>(
-    contracts.filter((c) => c.hint).map((c) => [c.area, c.hint!]),
-  )
+  const hintsByArea = new Map<string, string>(contracts.filter((c) => c.hint).map((c) => [c.area, c.hint!]))
 
   const grouped = new Map<string, string[]>()
 
@@ -85,10 +85,7 @@ export function formatFailures(failures: { area: string; message: string }[], co
   }
 
   return Array.from(grouped.entries()).flatMap(([area, messages]) => {
-    const lines = [
-      `[${area}]`,
-      ...messages.map((message) => `- ${message}`),
-    ]
+    const lines = [`[${area}]`, ...messages.map((message) => `- ${message}`)]
     const hint = hintsByArea.get(area)
     if (hint) lines.push(`  → ${hint}`)
     lines.push("")

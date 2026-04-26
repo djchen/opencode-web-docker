@@ -16,12 +16,21 @@
     "test:build-compat": "bun test tests",
     "typecheck": "tsc --noEmit",
     "build:runtime": "bun run build/transpile-runtime.ts",
+    "lint": "oxlint build runtime tests scripts",
     "docker:build": "docker build -t opencode-web-docker .",
-    "upstream:update": "./scripts/update-opencode-release.sh"
+    "upstream:update": "./scripts/update-opencode-release.sh",
+    "format": "prettier --write \"build/**/*.ts\" \"runtime/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"build/**/*.ts\" \"runtime/**/*.ts\" \"tests/**/*.ts\""
   },
   "devDependencies": {
     "@tsconfig/bun": "^1.0.0",
     "@types/bun": "1.3.13",
+    "oxlint": "^1.61.0",
+    "prettier": "3.6.2",
     "typescript": "5.8.x"
+  },
+  "prettier": {
+    "semi": false,
+    "printWidth": 120
   }
 }

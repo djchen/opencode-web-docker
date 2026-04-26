@@ -8,11 +8,7 @@ describe("static CSP compatibility", () => {
     )
 
     expect(expected.get("default-src")).toEqual(["'self'"])
-    expect(expected.get("script-src")).toEqual([
-      "'self'",
-      "'wasm-unsafe-eval'",
-      "'unsafe-inline'",
-    ])
+    expect(expected.get("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'", "'unsafe-inline'"])
     expect(expected.get("connect-src")).toEqual(["'self'", "data:", "http:", "https:", "ws:", "wss:"])
     expect(expected.get("base-uri")).toEqual(["'self'"])
     expect(expected.get("frame-ancestors")).toEqual(["'none'"])

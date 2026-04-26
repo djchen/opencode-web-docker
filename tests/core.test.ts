@@ -35,15 +35,7 @@ describe("runtime-config compatibility helpers", () => {
         { area: "patch A", message: "second failure" },
         { area: "patch B", message: "third failure" },
       ]),
-    ).toEqual([
-      "[patch A]",
-      "- first failure",
-      "- second failure",
-      "",
-      "[patch B]",
-      "- third failure",
-      "",
-    ])
+    ).toEqual(["[patch A]", "- first failure", "- second failure", "", "[patch B]", "- third failure", ""])
   })
 
   test("formatFailures includes per-area hints from contracts", () => {
@@ -75,10 +67,7 @@ describe("runtime-config compatibility helpers", () => {
 
   test("validateContracts rejects unknown source keys", () => {
     expect(() =>
-      validateContracts(
-        { entry: "path" },
-        [{ area: "patch", checks: [match("missing", /x/, "expected marker")] }],
-      ),
+      validateContracts({ entry: "path" }, [{ area: "patch", checks: [match("missing", /x/, "expected marker")] }]),
     ).toThrow("unknown source key in contract: patch: missing")
   })
 })

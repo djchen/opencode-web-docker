@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { initRuntimeConfig, extractUrl, defaultServerUrlKey, serverStoreKey } from "../runtime/runtime-config-core"
+import { describe, expect, test } from "bun:test"
+import { initRuntimeConfig, extractUrl } from "../runtime/runtime-config-core"
 import type { RuntimeConfigDeps, ServerListItem, ServerState } from "../runtime/types"
 import { MockStorage } from "./helpers/mock-storage"
 
-function createMockDeps(input: {
-  storage?: Record<string, string>
-  locationOrigin?: string
-  documentTitle?: string
-}): {
+function createMockDeps(input: { storage?: Record<string, string>; locationOrigin?: string; documentTitle?: string }): {
   deps: RuntimeConfigDeps
   storage: MockStorage
   warnings: string[][]
@@ -38,8 +34,12 @@ function createMockDeps(input: {
         onclick: null as ((e: MouseEvent) => void) | null,
         id: "",
         style: { cssText: "" },
-        setAttribute(key: string, value: string) { el.attributes[key] = value },
-        appendChild(child: HTMLElement) { el.children.push(child) },
+        setAttribute(key: string, value: string) {
+          el.attributes[key] = value
+        },
+        appendChild(child: HTMLElement) {
+          el.children.push(child)
+        },
         contains: () => false,
         remove: () => {},
         querySelector: () => null as HTMLElement | null,
@@ -56,8 +56,13 @@ function createMockDeps(input: {
     localStorage: storage as Storage,
     document: mockDocument as unknown as Document,
     location: mockLocation as unknown as Location,
-    window: windowObj as unknown as (Window & typeof globalThis),
-    console: { warn: (...args: unknown[]) => { warnings.push(args as string[]) }, log: () => {} },
+    window: windowObj as unknown as Window & typeof globalThis,
+    console: {
+      warn: (...args: unknown[]) => {
+        warnings.push(args as string[])
+      },
+      log: () => {},
+    },
   }
 
   return { deps, storage, warnings, window: windowObj }
@@ -110,7 +115,7 @@ function clearPreambleGlobals() {
 describe("runtime-config core", () => {
   test("sets document.title when appTitle is configured", () => {
     setPreambleGlobals({ serverUrl: "http://api1.example.com", appTitle: "My Hosted OpenCode" })
-    const { deps, storage } = createMockDeps({ storage: {} })
+    const { deps } = createMockDeps({ storage: {} })
 
     initRuntimeConfig(deps)
 
@@ -177,9 +182,7 @@ describe("runtime-config core", () => {
 
   test("skips localStorage writes when the effective config is unchanged", () => {
     const state: ServerState = {
-      list: [
-        { type: "http", http: { url: "http://api1.example.com" }, displayName: "Server 1" },
-      ],
+      list: [{ type: "http", http: { url: "http://api1.example.com" }, displayName: "Server 1" }],
       projects: { keep: true },
       lastProject: { keep: true },
     }

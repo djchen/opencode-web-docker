@@ -9,13 +9,7 @@ const files = await loadSources(root, sources)
 const failures = runContracts(files, contracts)
 
 if (failures.length) {
-  throw new Error(
-    [
-      "OpenCode compatibility check failed.",
-      "",
-      ...formatFailures(failures, contracts),
-    ].join("\n"),
-  )
+  throw new Error(["OpenCode compatibility check failed.", "", ...formatFailures(failures, contracts)].join("\n"))
 }
 
 console.log("OpenCode compatibility check passed")

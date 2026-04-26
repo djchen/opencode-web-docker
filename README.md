@@ -1,8 +1,6 @@
 # OpenCode Web Docker
 
-Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with runtime configuration injection. Designed for scenarios where you run an OpenCode server backend and want to centrally host the frontend.
-
-The OpenCode web app is normally tied to a single backend. This container decouples the frontend so it can be pointed at any `opencode serve` instance.
+Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with runtime configuration injection and sync for settings.
 
 ## Quick Start
 ### OpenCode Server

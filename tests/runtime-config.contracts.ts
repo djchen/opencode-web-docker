@@ -1,5 +1,5 @@
 import { every, match } from "./core"
-import type { Check, Contract } from "./core"
+import type { Contract } from "./core"
 
 export const entrySourcePath = "opencode/packages/app/src/entry.tsx"
 

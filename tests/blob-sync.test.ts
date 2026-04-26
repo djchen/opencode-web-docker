@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { createBlobSync } from "../runtime/blob-sync"
 import type { BlobSyncConfig, BlobSyncApi, SyncStatus } from "../runtime/types"
 
@@ -15,26 +15,39 @@ interface HarnessResult {
   runTimer: (id: number) => boolean
   runAllTimers: () => void
   runInterval: (id: number) => boolean
-  setMockPullResult: (r: { status: number; body: Record<string, unknown> | null } | Error | (() => Promise<{ status: number; body: Record<string, unknown> | null }>)) => void
+  setMockPullResult: (
+    r:
+      | { status: number; body: Record<string, unknown> | null }
+      | Error
+      | (() => Promise<{ status: number; body: Record<string, unknown> | null }>),
+  ) => void
   setReadLocalBlobResult: (r: Record<string, string | null> | (() => Record<string, string | null>)) => void
   setMockPushError: (v: boolean) => void
 }
 
-function createHarness(config: Partial<{
-  mockPullResult: { status: number; body: Record<string, unknown> | null } | Error
-  readLocalBlobResult: Record<string, string | null> | (() => Record<string, string | null>)
-  mockPushError: boolean
-  lastSyncTime: number | null
-  debounceMs: number
-  intervalMs: number
-  url: string
-  onFirstSyncDivergence: BlobSyncConfig["onFirstSyncDivergence"]
-}> = {}): HarnessResult {
+function createHarness(
+  config: Partial<{
+    mockPullResult: { status: number; body: Record<string, unknown> | null } | Error
+    readLocalBlobResult: Record<string, string | null> | (() => Record<string, string | null>)
+    mockPushError: boolean
+    lastSyncTime: number | null
+    debounceMs: number
+    intervalMs: number
+    url: string
+    onFirstSyncDivergence: BlobSyncConfig["onFirstSyncDivergence"]
+  }> = {},
+): HarnessResult {
   const statusChanges: Array<{ status: SyncStatus; ts: number | null; url: string }> = []
   const pullCalls: number[] = []
   const pushCalls: Array<Record<string, string | null>> = []
   const applyCalls: Array<Record<string, unknown>> = []
-  let mockPullResult: { status: number; body: Record<string, unknown> | null } | Error | (() => Promise<{ status: number; body: Record<string, unknown> | null }>) = config.mockPullResult ?? { status: 404, body: null }
+  let mockPullResult:
+    | { status: number; body: Record<string, unknown> | null }
+    | Error
+    | (() => Promise<{ status: number; body: Record<string, unknown> | null }>) = config.mockPullResult ?? {
+    status: 404,
+    body: null,
+  }
   let mockPushError = config.mockPushError ?? false
 
   const timers: Array<{ id: number; fn: () => void; ms: number }> = []
@@ -94,7 +107,8 @@ function createHarness(config: Partial<{
     return false
   }
 
-  let _readLocalBlobResult: Record<string, string | null> | (() => Record<string, string | null>) = config.readLocalBlobResult ?? {}
+  let _readLocalBlobResult: Record<string, string | null> | (() => Record<string, string | null>) =
+    config.readLocalBlobResult ?? {}
   let _firstSyncCb = config.onFirstSyncDivergence ?? null
 
   const onFirstSyncDivergence = _firstSyncCb
@@ -148,9 +162,15 @@ function createHarness(config: Partial<{
     runTimer,
     runAllTimers,
     runInterval,
-    setMockPullResult: (r) => { mockPullResult = r },
-    setReadLocalBlobResult: (r) => { _readLocalBlobResult = r },
-    setMockPushError: (v) => { mockPushError = v },
+    setMockPullResult: (r) => {
+      mockPullResult = r
+    },
+    setReadLocalBlobResult: (r) => {
+      _readLocalBlobResult = r
+    },
+    setMockPushError: (v) => {
+      mockPushError = v
+    },
   }
 }
 
@@ -408,7 +428,7 @@ describe("blob-sync", () => {
     let divergenceLocal: Record<string, string | null> | null = null
     let divergenceRemote: Record<string, unknown> | null = null
 
-    const h = createHarness({
+    createHarness({
       lastSyncTime: null,
       readLocalBlobResult: { "settings.v3": "local-val" },
       mockPullResult: {
@@ -561,9 +581,7 @@ describe("blob-sync", () => {
     h.runTimer(pushTimerEntry![0])
     await new Promise((r) => setTimeout(r, 10))
 
-    const connectedAfterPush = h.statusChanges.filter(
-      (c) => c.status === "connected",
-    )
+    const connectedAfterPush = h.statusChanges.filter((c) => c.status === "connected")
     expect(connectedAfterPush.length).toBeGreaterThanOrEqual(1)
   })
 

@@ -1,15 +1,6 @@
-import {
-  prepareStaticWebContracts,
-  prepareStaticWebSources,
-} from "./prepare-static-web.contracts"
-import {
-  runtimeConfigContracts,
-  runtimeConfigSources,
-} from "./runtime-config.contracts"
-import {
-  staticCspContracts,
-  staticCspSources,
-} from "./static-csp.contracts"
+import { prepareStaticWebContracts, prepareStaticWebSources } from "./prepare-static-web.contracts"
+import { runtimeConfigContracts, runtimeConfigSources } from "./runtime-config.contracts"
+import { staticCspContracts, staticCspSources } from "./static-csp.contracts"
 import type { Contract, Sources } from "./core"
 
 export const sources: Sources = {

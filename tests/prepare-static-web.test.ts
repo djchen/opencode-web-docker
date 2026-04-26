@@ -36,7 +36,7 @@ describe("prepare-static-web", () => {
 
     expect(updated).toContain('<script src="/runtime-config.js"></script>')
     expect(updated).toContain(`<link rel="stylesheet" href="/${customizationCssFileName}">`)
-    expect(updated.indexOf('/runtime-config.js')).toBeLessThan(updated.indexOf('/assets/app.js'))
+    expect(updated.indexOf("/runtime-config.js")).toBeLessThan(updated.indexOf("/assets/app.js"))
   })
 
   test("patchBuiltJs injects runtime bootstrap before location.origin fallback", () => {
@@ -44,12 +44,13 @@ describe("prepare-static-web", () => {
     const result = patchBuiltJs(content)
 
     expect(result.patched).toBe(true)
-    expect(result.updated).toContain('window.__OPENCODE_SERVER_URL||location.origin')
+    expect(result.updated).toContain("window.__OPENCODE_SERVER_URL||location.origin")
     expect(result.serverUrlPatched).toBe(true)
   })
 
   test("patchBuiltJs treats already-patched runtime hooks as satisfied without rewriting", () => {
-    const content = 'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":window.__OPENCODE_SERVER_URL||location.origin;'
+    const content =
+      'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":window.__OPENCODE_SERVER_URL||location.origin;'
     const result = patchBuiltJs(content)
 
     expect(result.patched).toBe(false)
@@ -73,7 +74,7 @@ describe("prepare-static-web", () => {
       path.join(distDir, "assets-app.js"),
       'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
     )
-    await writeFile(path.join(distDir, "unused.js"), 'return{ready:p,healthy:u,isLocal:S,setActive:h,add:f,remove:m}')
+    await writeFile(path.join(distDir, "unused.js"), "return{ready:p,healthy:u,isLocal:S,setActive:h,add:f,remove:m}")
 
     await writeFile(
       path.join(distDir, "index.html"),
@@ -87,11 +88,11 @@ describe("prepare-static-web", () => {
     const js = await readFile(path.join(distDir, "assets-app.js"), "utf8")
     const untouched = await readFile(path.join(distDir, "unused.js"), "utf8")
 
-    expect(html).toContain('/runtime-config.js')
+    expect(html).toContain("/runtime-config.js")
     expect(html).toContain(`/${customizationCssFileName}`)
     expect(css).toContain('[data-component="sidebar-rail"]')
-    expect(js).toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
-    expect(untouched).not.toContain('window.__OPENCODE_SERVER_URL')
+    expect(js).toContain("window.__OPENCODE_SERVER_URL||window.location.origin")
+    expect(untouched).not.toContain("window.__OPENCODE_SERVER_URL")
   })
 
   test("prepareStaticWeb can rerun on an already-patched dist", async () => {
