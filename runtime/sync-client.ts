@@ -11,10 +11,7 @@ const SYNC_ALLOWLIST: readonly string[] = [
 ]
 
 function _isAllowlisted(key: string): boolean {
-  for (let i = 0; i < SYNC_ALLOWLIST.length; i++) {
-    if (SYNC_ALLOWLIST[i] === key) return true
-  }
-  return false
+  return SYNC_ALLOWLIST.includes(key)
 }
 
 function _base64Utf8(value: string): string {
@@ -24,10 +21,7 @@ function _base64Utf8(value: string): string {
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
     return btoa(binary)
   }
-  if (typeof btoa === "function") {
-    return btoa(unescape(encodeURIComponent(value)))
-  }
-  return Buffer.from(value, "utf8").toString("base64")
+  return btoa(unescape(encodeURIComponent(value)))
 }
 
 function _buildAuthHeader(
@@ -46,8 +40,7 @@ function _readLocalBlob(
   localStorage: Storage,
 ): Record<string, string | null> {
   const blob: Record<string, string | null> = {}
-  for (let i = 0; i < SYNC_ALLOWLIST.length; i++) {
-    const key = SYNC_ALLOWLIST[i]!
+  for (const key of SYNC_ALLOWLIST) {
     const value = localStorage.getItem(key)
     if (value !== null) blob[key] = value
   }
@@ -62,8 +55,7 @@ function _applyRemoteBlob(
   if (!remote || typeof remote !== "object" || Array.isArray(remote)) return
   isSyncPullingRef.value = true
   try {
-    for (let i = 0; i < SYNC_ALLOWLIST.length; i++) {
-      const key = SYNC_ALLOWLIST[i]!
+    for (const key of SYNC_ALLOWLIST) {
       if (Object.prototype.hasOwnProperty.call(remote, key)) {
         const value = remote[key]
         if (value === null) {
@@ -353,14 +345,6 @@ function _injectSyncButton(
   if (root) observer.observe(root, { childList: true, subtree: true })
 }
 
-export interface InitSettingsSyncOptions {
-  syncUrl?: string
-  intervalSec?: string
-  authHeader?: string
-  username?: string
-  password?: string
-}
-
 let _globalSyncInitialized = false
 
 export function _resetSyncInitialized(): void {
@@ -391,8 +375,7 @@ export function initSettingsSync(
 
   if (_globalSyncInitialized) return
   _globalSyncInitialized = true
-  let _isSyncPulling = false
-  const _isSyncPullingRef = { get value() { return _isSyncPulling }, set value(v: boolean) { _isSyncPulling = v } }
+  const _isSyncPullingRef = { value: false }
   let _origSetItem: Storage["setItem"] | null = null
   let _origRemoveItem: Storage["removeItem"] | null = null
   let _sync: BlobSyncApi | null = null

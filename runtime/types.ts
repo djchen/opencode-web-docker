@@ -85,15 +85,3 @@ export interface RuntimeConfigDeps {
   console: Pick<typeof globalThis.console, "warn" | "log">
 }
 
-export interface RuntimeConfigGlobals {
-  serverUrl: string
-  serverName: string
-  serverUsername: string
-  serverPassword: string
-  appTitle: string
-  settingsSyncUrl: string
-  settingsSyncInterval: string
-  settingsSyncAuthHeader: string
-  settingsSyncUsername: string
-  settingsSyncPassword: string
-}
