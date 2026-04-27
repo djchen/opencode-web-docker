@@ -33,7 +33,7 @@ normalize_url() {
   printf '%s' "$with_scheme" | sed 's:/*$::'
 }
 
-b64enc() {
+encode_base64() {
   printf '%s' "$1" | base64 | tr -d '\n'
 }
 
@@ -100,7 +100,7 @@ else
 fi
 force_mode="force"
 default_server_index="1"
-app_title_b64="$(b64enc "$(get_env OPENCODE_APP_TITLE)")"
+app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
 
 case "$force_default_raw" in
   true)
@@ -129,10 +129,10 @@ esac
 server_entries=""
 index=1
 while [ "$index" -le "$max_index" ]; do
-  url_b64="$(b64enc "$(get_env "OPENCODE_SERVER_${index}_URL")")"
-  name_b64="$(b64enc "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
-  username_b64="$(b64enc "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
-  password_b64="$(b64enc "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"
+  url_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_URL")")"
+  name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
+  username_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
+  password_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"
 
   entry="{url:\"${url_b64}\",name:\"${name_b64}\",username:\"${username_b64}\",password:\"${password_b64}\"}"
   if [ -z "$server_entries" ]; then
