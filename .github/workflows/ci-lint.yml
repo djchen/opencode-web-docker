@@ -46,7 +46,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run build-compat unit tests
-        run: bun test tests
+        run: bun test
 
       - name: Run TypeScript typecheck
         run: bun run typecheck

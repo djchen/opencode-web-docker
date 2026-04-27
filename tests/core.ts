@@ -61,15 +61,12 @@ export function runContracts(
   contracts: Contract[],
 ): { area: string; message: string }[] {
   return contracts.flatMap((contract) => {
-    const failures = contract.checks
+    return contract.checks
       .filter((check) => !check.test(files))
       .map((check) => ({
         area: contract.area,
         message: check.message,
       }))
-
-    if (!failures.length) return []
-    return failures
   })
 }
 
