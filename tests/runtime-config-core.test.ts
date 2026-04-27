@@ -1,4 +1,9 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import vm from "node:vm"
+import { buildRuntimeBundle } from "../build/transpile-runtime"
 import { initRuntimeConfig } from "../runtime/runtime-config-core"
 import type { RuntimeConfigDeps } from "../runtime/types"
 
@@ -6,6 +11,24 @@ const serverStoreKey = "opencode.global.dat:server"
 const defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
 
 const encodeBase64 = (value: string): string => Buffer.from(value, "utf8").toString("base64")
+
+let bundleDir: string | undefined
+let bundledRuntimeSourcePromise: Promise<string> | undefined
+
+async function loadBundledRuntimeSource(): Promise<string> {
+  bundledRuntimeSourcePromise ??= (async () => {
+    bundleDir = await mkdtemp(path.join(os.tmpdir(), "runtime-bundle-test-"))
+    await buildRuntimeBundle(bundleDir)
+    return readFile(path.join(bundleDir, "runtime-bundle.js"), "utf8")
+  })()
+
+  return bundledRuntimeSourcePromise
+}
+
+afterAll(async () => {
+  if (!bundleDir) return
+  await rm(bundleDir, { recursive: true, force: true })
+})
 
 type GlobalMocks = {
   configuredServers: Array<{ url: string; name: string; username: string; password: string }>
@@ -96,6 +119,60 @@ function runWithDeps(input: {
     warnings,
     document: mockDocument,
     window: mockWindow,
+  }
+}
+
+async function runBundledRuntimeConfig(input: {
+  storage?: Record<string, string>
+  forceDefaultMode?: string
+  configuredDefaultIndex?: number
+  appTitle?: string
+  locationOrigin?: string
+  configuredServers?: Array<{ url: string; name: string; username: string; password: string }>
+}) {
+  const bundleSource = await loadBundledRuntimeSource()
+  const storage = new Map(Object.entries(input.storage ?? {}))
+  const setCalls: Array<{ key: string; value: string }> = []
+  const warnings: unknown[][] = []
+  const script = [
+    "function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}",
+    `var configuredServers = ${JSON.stringify(input.configuredServers ?? [])};`,
+    `var forceDefaultMode = ${JSON.stringify(input.forceDefaultMode ?? "force")};`,
+    `var configuredDefaultIndex = ${JSON.stringify(input.configuredDefaultIndex ?? 1)};`,
+    `var appTitle = ${JSON.stringify(input.appTitle ?? "")};`,
+    bundleSource,
+  ].join("\n")
+
+  const context = {
+    Buffer,
+    JSON,
+    TextDecoder,
+    Uint8Array,
+    atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
+    console: { warn: (...args: unknown[]) => warnings.push(args) },
+    document: { title: "OpenCode" },
+    location: { origin: input.locationOrigin ?? "http://frontend.example.com" },
+    localStorage: {
+      getItem: (key: string) => (storage.has(key) ? storage.get(key)! : null),
+      setItem: (key: string, value: string) => {
+        setCalls.push({ key, value })
+        storage.set(key, value)
+      },
+      removeItem: (key: string) => {
+        storage.delete(key)
+      },
+    },
+    window: {},
+  }
+
+  vm.runInNewContext(script, context, { timeout: 1000 })
+
+  return {
+    setCalls,
+    storage,
+    warnings,
+    document: context.document,
+    window: context.window,
   }
 }
 
@@ -299,5 +376,44 @@ describe("runtime-config-core", () => {
     })
 
     expect(result.document.title).toBe("My Hosted OpenCode")
+  })
+
+  test("bundled runtime artifact executes correctly with unicode metadata", async () => {
+    const result = await runBundledRuntimeConfig({
+      forceDefaultMode: "force",
+      configuredDefaultIndex: 2,
+      configuredServers: [
+        {
+          url: encodeBase64("https://api1.example.com"),
+          name: encodeBase64("München"),
+          username: encodeBase64("álîcè"),
+          password: encodeBase64("pässwörd"),
+        },
+        {
+          url: encodeBase64("https://api2.example.com/"),
+          name: encodeBase64("東京"),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      appTitle: encodeBase64("你好 OpenCode"),
+      storage: {
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+
+    expect(result.document.title).toBe("你好 OpenCode")
+    expect((result.window as { __OPENCODE_SERVER_URL?: string }).__OPENCODE_SERVER_URL).toBe("https://api1.example.com")
+    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api2.example.com")
+    expect(saved.list.map((item: { http: { url: string } }) => item.http.url)).toEqual([
+      "https://api1.example.com",
+      "https://api2.example.com",
+    ])
+    expect(saved.list[0].displayName).toBe("München")
+    expect(saved.list[0].http.username).toBe("álîcè")
+    expect(saved.list[0].http.password).toBe("pässwörd")
+    expect(saved.list[1].displayName).toBe("東京")
   })
 })

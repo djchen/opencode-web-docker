@@ -72,7 +72,73 @@ expect_generated_runtime_config_parses() {
 
   printf '==> %s\n' "$name"
   runtime_config_js="$("$@")"
-  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function(source)})}'
+  printf '%s' "$runtime_config_js" | node -e 'process.stdin.setEncoding("utf8");let source="";process.stdin.on("data",(chunk)=>source+=chunk);process.stdin.on("end",()=>{new Function(source)})'
+}
+
+expect_generated_runtime_config_applies() {
+  name="$1"
+  expected_title="$2"
+  expected_bootstrap_url="$3"
+  expected_default_url="$4"
+  expected_list_json="$5"
+  shift 5
+
+  printf '==> %s\n' "$name"
+  runtime_config_js="$("$@")"
+  printf '%s' "$runtime_config_js" | node -e '
+    const vm = require("node:vm")
+    const [expectedTitle, expectedBootstrapUrl, expectedDefaultUrl, expectedListJson] = process.argv.slice(1)
+    let source = ""
+    process.stdin.setEncoding("utf8")
+    process.stdin.on("data", (chunk) => (source += chunk))
+    process.stdin.on("end", () => {
+      const storage = new Map()
+      const context = {
+        Buffer,
+        JSON,
+        TextDecoder,
+        Uint8Array,
+        atob: (value) => Buffer.from(value, "base64").toString("binary"),
+        console,
+        document: { title: "OpenCode" },
+        location: { origin: "http://frontend.example.com" },
+        localStorage: {
+          getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+          setItem: (key, value) => storage.set(key, value),
+          removeItem: (key) => storage.delete(key),
+        },
+        window: {},
+      }
+
+      vm.runInNewContext(source, context, { timeout: 1000 })
+
+      const savedStateRaw = storage.get("opencode.global.dat:server")
+      if (!savedStateRaw) throw new Error("Missing persisted server state")
+
+      const savedState = JSON.parse(savedStateRaw)
+      const savedList = savedState.list.map((item) => ({
+        url: item.http?.url ?? item.url,
+        name: item.displayName ?? "",
+        username: item.http?.username ?? "",
+        password: item.http?.password ?? "",
+      }))
+
+      if (context.document.title !== expectedTitle) {
+        throw new Error(`Expected document.title=${JSON.stringify(expectedTitle)}, got ${JSON.stringify(context.document.title)}`)
+      }
+      if (context.window.__OPENCODE_SERVER_URL !== expectedBootstrapUrl) {
+        throw new Error(`Expected bootstrap URL ${JSON.stringify(expectedBootstrapUrl)}, got ${JSON.stringify(context.window.__OPENCODE_SERVER_URL)}`)
+      }
+      if (storage.get("opencode.settings.dat:defaultServerUrl") !== expectedDefaultUrl) {
+        throw new Error(`Expected default server URL ${JSON.stringify(expectedDefaultUrl)}, got ${JSON.stringify(storage.get("opencode.settings.dat:defaultServerUrl"))}`)
+      }
+
+      const expectedList = JSON.parse(expectedListJson)
+      if (JSON.stringify(savedList) !== JSON.stringify(expectedList)) {
+        throw new Error(`Expected server list ${expectedListJson}, got ${JSON.stringify(savedList)}`)
+      }
+    })
+  ' "$expected_title" "$expected_bootstrap_url" "$expected_default_url" "$expected_list_json"
 }
 
 expect_failure \
@@ -145,7 +211,40 @@ expect_success \
     -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
     -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && test -s /opt/opencode-web/public/opencode-web-customizations.css && grep -F "var configuredDefaultIndex = 2" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "var forceDefaultMode = \"force\"" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "window.__OPENCODE_SERVER_URL = bootstrapUrl" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "bootstrapUrl = mergedConfigured[0].http.url" /opt/opencode-web/public/runtime-config.js >/dev/null && grep -F "var appTitle = \"SG9zdGVkIE9wZW5Db2Rl\"" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "window.__OPENCODE_SERVER_URL = effectiveDefaultUrl" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "index:" /opt/opencode-web/public/runtime-config.js >/dev/null && ! grep -F "<style id=\"opencode-web-customizations\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /opt/opencode-web/public/index.html >/dev/null'
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && test -s /opt/opencode-web/public/opencode-web-customizations.css && ! grep -F "<style id=\"opencode-web-customizations\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /opt/opencode-web/public/index.html >/dev/null'
+
+expect_generated_runtime_config_applies \
+  "generated runtime-config applies expected multi-backend state" \
+  "Hosted OpenCode" \
+  "http://api1.example.com" \
+  "https://api2.example.com" \
+  '[{"url":"http://api1.example.com","name":"Server 1","username":"","password":""},{"url":"https://api2.example.com","name":"","username":"","password":""}]' \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=api1.example.com \
+    -e OPENCODE_SERVER_1_NAME=Server\ 1 \
+    -e OPENCODE_SERVER_2_URL=https://api2.example.com/ \
+    -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
+    -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
+    "$image_tag" \
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+
+expect_generated_runtime_config_applies \
+  "generated runtime-config preserves unicode metadata" \
+  "你好 OpenCode" \
+  "https://api1.example.com" \
+  "https://api2.example.com" \
+  '[{"url":"https://api1.example.com","name":"München","username":"álîcè","password":"pässwörd"},{"url":"https://api2.example.com","name":"東京","username":"","password":""}]' \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=https://api1.example.com \
+    -e OPENCODE_SERVER_1_NAME=München \
+    -e OPENCODE_SERVER_1_USERNAME=álîcè \
+    -e OPENCODE_SERVER_1_PASSWORD=pässwörd \
+    -e OPENCODE_SERVER_2_URL=https://api2.example.com/ \
+    -e OPENCODE_SERVER_2_NAME=東京 \
+    -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
+    -e OPENCODE_APP_TITLE=你好\ OpenCode \
+    "$image_tag" \
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
 
 expect_generated_runtime_config_parses \
   "generated runtime-config.js parses as JavaScript" \
