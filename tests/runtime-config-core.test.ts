@@ -97,7 +97,7 @@ function runWithDeps(input: {
   }
 }
 
-describe("runtime-config-core TS", () => {
+describe("runtime-config-core", () => {
   test("keeps configured servers first, preserves extra servers, and removes location.origin fallback", () => {
     const state = {
       list: [
