@@ -14,7 +14,7 @@
 - Published image: `ghcr.io/djchen/opencode-web-docker` (`linux/amd64`, `linux/arm64`)
 - Quick upstream app build check: `bun run --cwd opencode/packages/app build`
 - Build runtime bundle: `bun run build:runtime`
-- Tests: `bun test tests`
+- Tests: `bun test`
 - Typecheck: `bun run typecheck`
 - Lint: `bun run lint`
 - Format: `bun run format`
@@ -43,7 +43,7 @@
 
 - The upstream default branch and CI base branch are `dev`, not `main`.
 - Bun version is pinned in both `package.json` and `Dockerfile`; keep them in sync.
-- Primary root verification is `docker build -t opencode-web-docker .`. Focused repo checks are `bun test tests`, `bun run typecheck`, `bun run lint`, `bun run format:check`, and `./scripts/test-runtime-config.sh --build`.
+- Primary root verification is `docker build -t opencode-web-docker .`. Focused repo checks are `bun test`, `bun run typecheck`, `bun run lint`, `bun run format:check`, and `./scripts/test-runtime-config.sh --build`.
 - Upstream typecheck: `cd opencode && bun typecheck`
 - Do not run `cd opencode && bun test`; it intentionally fails. Use focused package tests such as `cd opencode/packages/opencode && bun test` or `cd opencode/packages/app && bun test:unit`.
 - For local browser UI work, run the backend from `opencode/packages/opencode` with `cd opencode/packages/opencode && bun run --conditions=browser ./src/index.ts serve --port 4096`, run the app from `opencode/packages/app` with `cd opencode/packages/app && bun dev -- --port 4444`, and use `http://localhost:4444`.
