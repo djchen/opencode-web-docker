@@ -9,3 +9,4 @@ tmp
 opencode/node_modules/
 opencode/.turbo/
 .playwright-cli/
+dist/

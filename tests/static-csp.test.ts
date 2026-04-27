@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildExpectedStaticWebCsp } from "./static-csp.contracts.mjs"
+import { buildExpectedStaticWebCsp } from "./static-csp.contracts"
 
 describe("static CSP compatibility", () => {
   test("adds only deployment-specific directives to upstream CSP", () => {
@@ -8,11 +8,7 @@ describe("static CSP compatibility", () => {
     )
 
     expect(expected.get("default-src")).toEqual(["'self'"])
-    expect(expected.get("script-src")).toEqual([
-      "'self'",
-      "'wasm-unsafe-eval'",
-      "'unsafe-inline'",
-    ])
+    expect(expected.get("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'", "'unsafe-inline'"])
     expect(expected.get("connect-src")).toEqual(["'self'", "data:", "http:", "https:", "ws:", "wss:"])
     expect(expected.get("base-uri")).toEqual(["'self'"])
     expect(expected.get("frame-ancestors")).toEqual(["'none'"])

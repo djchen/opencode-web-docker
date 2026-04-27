@@ -37,10 +37,11 @@ encode_base64() {
   printf '%s' "$1" | base64 | tr -d '\n'
 }
 
-runtime_config_core_path="/usr/local/share/opencode-web/runtime-config-core.js"
-runtime_config_path="/home/sws/public/runtime-config.js"
-if [ ! -r "$runtime_config_core_path" ]; then
-  die "Missing runtime-config core JS at $runtime_config_core_path"
+runtime_root="/opt/opencode-web"
+runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
+runtime_config_path="$runtime_root/public/runtime-config.js"
+if [ ! -r "$runtime_bundle_path" ]; then
+  die "Missing runtime bundle at $runtime_bundle_path"
 fi
 
 raw_indexes=""
@@ -61,7 +62,8 @@ for env_name in $env_names; do
   esac
 done
 
-if [ -z "$(trim "$raw_indexes")" ]; then
+raw_indexes="${raw_indexes# }"
+if [ -z "$raw_indexes" ]; then
   die "OPENCODE_SERVER_1_URL is required."
 fi
 
@@ -104,8 +106,6 @@ app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
 
 case "$force_default_raw" in
   true)
-    force_mode="force"
-    default_server_index="1"
     ;;
   "")
     die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."
@@ -126,34 +126,34 @@ case "$force_default_raw" in
     ;;
 esac
 
-cat > "$runtime_config_path" <<EOF
-;(function () {
-  var defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
-  var serverStoreKey = "opencode.global.dat:server"
-  var forceDefaultMode = "${force_mode}"
-  var configuredDefaultIndex = ${default_server_index}
-  var appTitle = "${app_title_b64}"
-  var configuredServers = [
-EOF
-
+server_entries=""
 index=1
 while [ "$index" -le "$max_index" ]; do
   url_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_URL")")"
   name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
   username_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
   password_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"
-  separator=","
-  if [ "$index" -eq "$max_index" ]; then
-    separator=""
-  fi
 
-  printf '    { url: "%s", name: "%s", username: "%s", password: "%s" }%s\n' \
-    "$url_b64" "$name_b64" "$username_b64" "$password_b64" "$separator" >> "$runtime_config_path"
+  entry="{url:\"${url_b64}\",name:\"${name_b64}\",username:\"${username_b64}\",password:\"${password_b64}\"}"
+  if [ -z "$server_entries" ]; then
+    server_entries="$entry"
+  else
+    server_entries="${server_entries},${entry}"
+  fi
   index=$((index + 1))
 done
 
-printf '  ]\n' >> "$runtime_config_path"
+{
+  cat <<'PREAMBLE'
+function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}
+PREAMBLE
 
-cat "$runtime_config_core_path" >> "$runtime_config_path"
+  printf 'var configuredServers = [%s];\n' "$server_entries"
+  printf 'var forceDefaultMode = "%s";\n' "$force_mode"
+  printf 'var configuredDefaultIndex = %s;\n' "$default_server_index"
+  printf 'var appTitle = "%s";\n' "$app_title_b64"
+
+  cat "$runtime_bundle_path"
+} > "$runtime_config_path"
 
 exec "$@"
