@@ -31,7 +31,7 @@ RUN bun run build:runtime
 RUN bun run --cwd opencode/packages/app build
 RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
 RUN mkdir -p release/public release/runtime release/config \
- && cp -r config/ release/config/ \
+ && cp -r config/. release/config/ \
  && cp dist/runtime/runtime-bundle.js release/runtime/ \
  && cp runtime/entrypoint.sh release/runtime/ \
  && cp -r opencode/packages/app/dist/. release/public/
