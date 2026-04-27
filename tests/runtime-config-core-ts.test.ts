@@ -70,7 +70,7 @@ function runWithDeps(input: {
     document: mockDocument as unknown as Document,
     location: { origin: input.locationOrigin ?? "http://frontend.example.com" } as Location,
     window: mockWindow as unknown as Window & typeof globalThis,
-    console: { warn: (...args: unknown[]) => warnings.push(args), log: () => {} },
+    console: { warn: (...args: unknown[]) => warnings.push(args) },
   }
 
   const setCalls: Array<{ key: string; value: string }> = []

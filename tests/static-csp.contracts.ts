@@ -16,19 +16,19 @@ export const staticCspSources: Record<string, string> = {
   uiRoutes: "opencode/packages/opencode/src/server/routes/ui.ts",
 }
 
-export function extractUpstreamDefaultCsp(source: string): string {
+function extractUpstreamDefaultCsp(source: string): string {
   const cspMatch = source.match(upstreamDefaultCspPattern)
   if (!cspMatch) throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts")
   return cspMatch[1]!
 }
 
-export function extractStaticWebCsp(source: string): string {
+function extractStaticWebCsp(source: string): string {
   const cspMatch = source.match(staticWebCspPattern)
   if (!cspMatch) throw new Error("Could not locate Content-Security-Policy in config/sws.toml")
   return cspMatch[1]!
 }
 
-export function parseCsp(csp: string): Map<string, string[]> {
+function parseCsp(csp: string): Map<string, string[]> {
   return new Map(
     csp
       .split(";")
@@ -66,7 +66,7 @@ function sameValues(actual: string[], expected: string[]): boolean {
   )
 }
 
-export function sameCsp(actual: Map<string, string[]>, expected: Map<string, string[]>): boolean {
+function sameCsp(actual: Map<string, string[]>, expected: Map<string, string[]>): boolean {
   const actualKeys = [...actual.keys()].sort()
   const expectedKeys = [...expected.keys()].sort()
 

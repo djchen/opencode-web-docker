@@ -1,4 +1,4 @@
-export interface ServerHttpInfo {
+interface ServerHttpInfo {
   url: string
   username?: string
   password?: string
@@ -8,7 +8,6 @@ export interface ServerListItem {
   type: string
   http?: ServerHttpInfo
   displayName?: string
-  url?: string
 }
 
 export interface ServerState {
@@ -22,5 +21,5 @@ export interface RuntimeConfigDeps {
   document: Document
   location: Location
   window: Window & typeof globalThis
-  console: Pick<typeof globalThis.console, "warn" | "log">
+  console: Pick<typeof globalThis.console, "warn">
 }

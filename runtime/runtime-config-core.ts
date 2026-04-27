@@ -201,5 +201,3 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
     d.console.warn("Failed to apply OpenCode runtime config", error)
   }
 }
-
-export { defaultServerUrlKey, serverStoreKey }

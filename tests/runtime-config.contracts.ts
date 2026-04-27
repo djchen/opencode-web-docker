@@ -12,7 +12,7 @@ export const runtimeConfigSources: Record<string, string> = {
 export const runtimeConfigContracts: Contract[] = [
   {
     area: "runtime-config persistence",
-    hint: "If a localStorage key name or type shape changed, update runtime/runtime-config-core.js; if only the internal variable was renamed, update the contract regex.",
+    hint: "If a localStorage key name or type shape changed, update runtime/runtime-config-core.ts; if only the internal variable was renamed, update the contract regex.",
     checks: [
       match(
         "entry",
