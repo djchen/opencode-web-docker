@@ -66,6 +66,20 @@ expect_success() {
   "$@"
 }
 
+expect_final_image_layout() {
+  name="$1"
+  shift
+
+  printf '==> %s\n' "$name"
+  "$@" sh -lc '
+    test -f /opt/opencode-web/config/sws.toml &&
+    test ! -e /opt/opencode-web/config/config &&
+    test -f /opt/opencode-web/public/index.html &&
+    test -f /opt/opencode-web/runtime/entrypoint.sh &&
+    test -f /opt/opencode-web/runtime/runtime-bundle.js
+  '
+}
+
 expect_generated_runtime_config_parses() {
   name="$1"
   shift
@@ -193,6 +207,12 @@ expect_failure \
     true
 
 multiline_env_value="$(printf 'before\nOPENCODE_SERVER_9_URL\nafter')"
+
+expect_final_image_layout \
+  "final image layout is sane" \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=http://api1.example.com \
+    "$image_tag"
 
 expect_success \
   "ignore multiline env values while scanning backend vars" \
