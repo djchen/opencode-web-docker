@@ -5,11 +5,7 @@ FROM oven/bun:1.3.13 AS build
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
-    g++ \
     git \
-    make \
-    pkg-config \
-    python3 \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,9 +17,8 @@ COPY opencode/.husky ./opencode/.husky
 COPY --parents \
   opencode/./packages/**/package.json \
   ./opencode/
-COPY opencode/packages/opencode/script/fix-node-pty.ts ./opencode/packages/opencode/script/fix-node-pty.ts
 
-RUN bun install --cwd opencode --frozen-lockfile
+RUN bun install --cwd opencode --frozen-lockfile --ignore-scripts
 
 COPY opencode ./opencode
 COPY config ./config
