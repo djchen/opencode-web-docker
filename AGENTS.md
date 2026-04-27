@@ -38,7 +38,7 @@
 **Upstream OpenCode**
 
 - The upstream default branch and CI base branch are `dev`, not `main`.
-- Bun version is pinned to `1.3.12` in both `package.json` and the Dockerfile.
+- Bun version is pinned in both `package.json` and the Dockerfile; keep them in sync.
 - Primary root verification is `docker build -t opencode-web-docker .`; repo-owned focused checks also include `bun test`, `bun run typecheck`, and `./scripts/test-runtime-config.sh`.
 - Upstream typecheck: `cd opencode && bun typecheck`
 - Do not run `cd opencode && bun test`; it intentionally exits with "do not run tests from root". Use focused tests from package dirs (`cd opencode/packages/opencode && bun test`, `cd opencode/packages/app && bun test:unit`, etc.).
