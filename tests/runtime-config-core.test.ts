@@ -261,6 +261,38 @@ describe("runtime-config-core", () => {
     expect(result.window.__OPENCODE_SERVER_URL).toBe("http://api1.example.com")
   })
 
+  test("normalizes a preserved default URL so it still matches a configured server", () => {
+    const result = runWithDeps({
+      forceDefaultMode: "preserve",
+      configuredDefaultIndex: 1,
+      configuredServers: [
+        {
+          url: encodeBase64("https://api1.example.com"),
+          name: encodeBase64("Server 1"),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+        {
+          url: encodeBase64("https://api2.example.com"),
+          name: encodeBase64("Server 2"),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      storage: {
+        [defaultServerUrlKey]: "https://api2.example.com/",
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    const savedUrls = saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)
+
+    expect(savedUrls).toEqual(["https://api1.example.com", "https://api2.example.com"])
+    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api2.example.com")
+    expect(savedUrls).toContain(result.storage.get(defaultServerUrlKey))
+  })
+
   test("skips localStorage writes when the effective config is unchanged", () => {
     const state = {
       list: [
