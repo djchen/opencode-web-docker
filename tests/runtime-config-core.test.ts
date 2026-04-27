@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { initRuntimeConfig } from "../runtime/runtime-config-core"
 import type { RuntimeConfigDeps } from "../runtime/types"
 
+const serverStoreKey = "opencode.global.dat:server"
+const defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
+
 const encodeBase64 = (value: string): string => Buffer.from(value, "utf8").toString("base64")
 
 type GlobalMocks = {
@@ -50,6 +53,7 @@ function runWithDeps(input: {
 }) {
   const storage = new Map(Object.entries(input.storage ?? {}))
   const warnings: unknown[][] = []
+  const setCalls: Array<{ key: string; value: string }> = []
   const mockWindow: Record<string, unknown> = {}
   const mockDocument = { title: "OpenCode" }
 
@@ -72,8 +76,6 @@ function runWithDeps(input: {
     window: mockWindow as unknown as Window & typeof globalThis,
     console: { warn: (...args: unknown[]) => warnings.push(args) },
   }
-
-  const setCalls: Array<{ key: string; value: string }> = []
 
   setupGlobals({
     configuredServers: input.configuredServers ?? [],
@@ -131,11 +133,11 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.global.dat:server": JSON.stringify(state),
+        [serverStoreKey]: JSON.stringify(state),
       },
     })
 
-    const saved = JSON.parse(result.storage.get("opencode.global.dat:server")!)
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
     expect(saved.projects).toEqual(state.projects)
     expect(saved.lastProject).toEqual(state.lastProject)
     expect(saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)).toEqual([
@@ -148,12 +150,9 @@ describe("runtime-config-core", () => {
     expect(saved.list[0].http.password).toBe("old-pass")
     expect(saved.list[1].http.username).toBe("alice")
     expect(saved.list[1].http.password).toBe("secret")
-    expect(result.setCalls.map((call) => call.key)).toEqual([
-      "opencode.global.dat:server",
-      "opencode.settings.dat:defaultServerUrl",
-    ])
+    expect(result.setCalls.map((call) => call.key)).toEqual([serverStoreKey, defaultServerUrlKey])
     expect(result.window.__OPENCODE_SERVER_URL).toBe("http://persisted.example.com")
-    expect(result.storage.get("opencode.settings.dat:defaultServerUrl")).toBe("https://api2.example.com")
+    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api2.example.com")
   })
 
   test("preserves a valid persisted default in preserve mode without rewriting it", () => {
@@ -175,13 +174,13 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.settings.dat:defaultServerUrl": "http://api2.example.com",
-        "opencode.global.dat:server": JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [defaultServerUrlKey]: "http://api2.example.com",
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
       },
     })
 
-    expect(result.storage.get("opencode.settings.dat:defaultServerUrl")).toBe("http://api2.example.com")
-    expect(result.setCalls.some((call) => call.key === "opencode.settings.dat:defaultServerUrl")).toBe(false)
+    expect(result.storage.get(defaultServerUrlKey)).toBe("http://api2.example.com")
+    expect(result.setCalls.some((call) => call.key === defaultServerUrlKey)).toBe(false)
     expect(result.window.__OPENCODE_SERVER_URL).toBe("http://api1.example.com")
   })
 
@@ -207,8 +206,8 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.settings.dat:defaultServerUrl": "http://api1.example.com",
-        "opencode.global.dat:server": JSON.stringify(state),
+        [defaultServerUrlKey]: "http://api1.example.com",
+        [serverStoreKey]: JSON.stringify(state),
       },
     })
 
@@ -229,8 +228,8 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.settings.dat:defaultServerUrl": "http://frontend.example.com",
-        "opencode.global.dat:server": JSON.stringify({
+        [defaultServerUrlKey]: "http://frontend.example.com",
+        [serverStoreKey]: JSON.stringify({
           list: [
             { type: "http", http: { url: "http://frontend.example.com" }, displayName: "Frontend" },
             { type: "http", http: { url: "http://custom.example.com" }, displayName: "Custom" },
@@ -241,12 +240,12 @@ describe("runtime-config-core", () => {
       },
     })
 
-    const saved = JSON.parse(result.storage.get("opencode.global.dat:server")!)
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
     expect(saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)).toEqual([
       "http://api1.example.com",
       "http://custom.example.com",
     ])
-    expect(result.storage.get("opencode.settings.dat:defaultServerUrl")).toBe("http://api1.example.com")
+    expect(result.storage.get(defaultServerUrlKey)).toBe("http://api1.example.com")
   })
 
   test("warns and recovers from an incompatible persisted store", () => {
@@ -260,15 +259,27 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.global.dat:server": JSON.stringify({ list: {}, projects: null, lastProject: "broken" }),
+        [serverStoreKey]: JSON.stringify({ list: {}, projects: null, lastProject: "broken" }),
       },
     })
 
-    const saved = JSON.parse(result.storage.get("opencode.global.dat:server")!)
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
     expect(saved.list).toHaveLength(1)
     expect(saved.projects).toEqual({})
     expect(saved.lastProject).toEqual({})
     expect(result.warnings.length).toBeGreaterThan(0)
+  })
+
+  test("returns early when no configured servers are present", () => {
+    const result = runWithDeps({
+      configuredServers: [],
+      storage: {
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    expect(result.setCalls).toHaveLength(0)
+    expect(result.window.__OPENCODE_SERVER_URL).toBeUndefined()
   })
 
   test("sets document.title when appTitle is configured", () => {
@@ -282,7 +293,7 @@ describe("runtime-config-core", () => {
         },
       ],
       storage: {
-        "opencode.global.dat:server": JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
       },
       appTitle: encodeBase64("My Hosted OpenCode"),
     })

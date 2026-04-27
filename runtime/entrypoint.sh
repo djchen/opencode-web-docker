@@ -45,6 +45,7 @@ if [ ! -r "$runtime_bundle_path" ]; then
 fi
 
 raw_indexes=""
+# Read null-delimited env entries so multiline values cannot inject bogus names.
 env_names="$(env -0 | xargs -0 -n1 sh -c 'entry=$1; printf "%s\n" "${entry%%=*}"' sh)"
 for env_name in $env_names; do
   case "$env_name" in
@@ -61,7 +62,8 @@ for env_name in $env_names; do
   esac
 done
 
-if [ -z "$(trim "$raw_indexes")" ]; then
+raw_indexes="${raw_indexes# }"
+if [ -z "$raw_indexes" ]; then
   die "OPENCODE_SERVER_1_URL is required."
 fi
 
@@ -104,8 +106,6 @@ app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
 
 case "$force_default_raw" in
   true)
-    force_mode="force"
-    default_server_index="1"
     ;;
   "")
     die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."

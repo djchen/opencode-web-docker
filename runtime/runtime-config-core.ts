@@ -85,7 +85,8 @@ function buildConfiguredServers(existingByUrl: Record<string, ServerListItem>) {
   const mergedConfigured: ServerListItem[] = []
 
   for (let i = 0; i < configuredServers.length; i++) {
-    const server = configuredServers[i] || ({} as { url: string; name: string; username: string; password: string })
+    const server = configuredServers[i]
+    if (!server) continue
     const serverUrl = normalizeUrl(_b64d(server.url))
     if (!serverUrl) continue
 
@@ -117,10 +118,7 @@ function buildConfiguredServers(existingByUrl: Record<string, ServerListItem>) {
 }
 
 function listHasUrl(list: ServerListItem[], url: string): boolean {
-  for (let i = 0; i < list.length; i++) {
-    if (storedUrl(list[i]) === url) return true
-  }
-  return false
+  return list.some((item) => storedUrl(item) === url)
 }
 
 export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
@@ -134,7 +132,7 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
 
   try {
     const nextTitle = _b64d(appTitle).trim()
-    if (nextTitle && typeof d.document === "object" && d.document) {
+    if (nextTitle) {
       d.document.title = nextTitle
     }
 
@@ -173,15 +171,10 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
     const bootstrapUrl = mergedConfigured[0]!.http!.url
     const configuredDefault = mergedConfigured[configuredDefaultIndex - 1]
     const fallbackDefaultUrl = configuredDefault?.http?.url ?? ""
-    let effectiveDefaultUrl = ""
-
-    if (forceDefaultMode === "force") {
-      effectiveDefaultUrl = fallbackDefaultUrl
-    } else if (effectivePersistedDefault && listHasUrl(nextList, effectivePersistedDefault)) {
-      effectiveDefaultUrl = effectivePersistedDefault
-    } else {
-      effectiveDefaultUrl = fallbackDefaultUrl
-    }
+    const effectiveDefaultUrl =
+      forceDefaultMode !== "force" && effectivePersistedDefault && listHasUrl(nextList, effectivePersistedDefault)
+        ? effectivePersistedDefault
+        : fallbackDefaultUrl
 
     if (!effectiveDefaultUrl) return
 
