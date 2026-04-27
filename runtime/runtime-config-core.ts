@@ -186,7 +186,10 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
 
     if (
       persistedDefaultRaw !== effectiveDefaultUrl &&
-      (forceDefaultMode === "force" || !persistedDefault || !listHasUrl(nextList, persistedDefault))
+      (forceDefaultMode === "force" ||
+        !persistedDefault ||
+        !listHasUrl(nextList, persistedDefault) ||
+        persistedDefaultRaw !== persistedDefault)
     ) {
       d.localStorage.setItem(defaultServerUrlKey, effectiveDefaultUrl)
     }
