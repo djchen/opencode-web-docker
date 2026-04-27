@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { every, formatFailures, match, runContracts, validateContracts } from "./core.mjs"
+import { every, formatFailures, match, runContracts, validateContracts } from "./core"
+import type { Contract } from "./core"
 
 describe("runtime-config compatibility helpers", () => {
   test("runContracts returns grouped failure entries", () => {
-    const contracts = [
+    const contracts: Contract[] = [
       {
         area: "example area",
         checks: [
@@ -34,23 +35,39 @@ describe("runtime-config compatibility helpers", () => {
         { area: "patch A", message: "second failure" },
         { area: "patch B", message: "third failure" },
       ]),
-    ).toEqual([
+    ).toEqual(["[patch A]", "- first failure", "- second failure", "", "[patch B]", "- third failure", ""])
+  })
+
+  test("formatFailures includes per-area hints from contracts", () => {
+    const contracts: Contract[] = [
+      { area: "patch A", hint: "Update patch A.", checks: [] },
+      { area: "patch B", hint: "Update patch B.", checks: [] },
+      { area: "patch C", checks: [] },
+    ]
+
+    const result = formatFailures(
+      [
+        { area: "patch A", message: "first failure" },
+        { area: "patch B", message: "second failure" },
+      ],
+      contracts,
+    )
+
+    expect(result).toEqual([
       "[patch A]",
       "- first failure",
-      "- second failure",
+      "  → Update patch A.",
       "",
       "[patch B]",
-      "- third failure",
+      "- second failure",
+      "  → Update patch B.",
       "",
     ])
   })
 
   test("validateContracts rejects unknown source keys", () => {
     expect(() =>
-      validateContracts(
-        { entry: "path" },
-        [{ area: "patch", checks: [match("missing", /x/, "expected marker")] }],
-      ),
+      validateContracts({ entry: "path" }, [{ area: "patch", checks: [match("missing", /x/, "expected marker")] }]),
     ).toThrow("unknown source key in contract: patch: missing")
   })
 })

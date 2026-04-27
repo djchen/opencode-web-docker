@@ -8,15 +8,15 @@ import {
   injectHtml,
   patchBuiltJs,
   prepareStaticWeb,
-} from "../build/prepare-static-web.mjs"
+} from "../build/prepare-static-web"
 
-const tempDirs = []
+const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
-async function makeTempDir(prefix) {
+async function makeTempDir(prefix: string): Promise<string> {
   const dir = await mkdtemp(path.join(os.tmpdir(), prefix))
   tempDirs.push(dir)
   return dir
@@ -36,7 +36,7 @@ describe("prepare-static-web", () => {
 
     expect(updated).toContain('<script src="/runtime-config.js"></script>')
     expect(updated).toContain(`<link rel="stylesheet" href="/${customizationCssFileName}">`)
-    expect(updated.indexOf('/runtime-config.js')).toBeLessThan(updated.indexOf('type="module"'))
+    expect(updated.indexOf("/runtime-config.js")).toBeLessThan(updated.indexOf('type="module"'))
   })
 
   test("patchBuiltJs injects runtime bootstrap before location.origin fallback", () => {
@@ -44,7 +44,17 @@ describe("prepare-static-web", () => {
     const result = patchBuiltJs(content)
 
     expect(result.patched).toBe(true)
-    expect(result.updated).toContain('window.__OPENCODE_SERVER_URL||location.origin')
+    expect(result.updated).toContain("window.__OPENCODE_SERVER_URL||location.origin")
+  })
+
+  test("patchBuiltJs treats already-patched content as idempotent", () => {
+    const content =
+      'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":window.__OPENCODE_SERVER_URL||location.origin;'
+    const result = patchBuiltJs(content)
+
+    expect(result.serverUrlPatched).toBe(true)
+    expect(result.patched).toBe(false)
+    expect(result.updated).toBe(content)
   })
 
   test("getReferencedJsPaths returns only local JS assets from index.html", () => {
@@ -59,8 +69,14 @@ describe("prepare-static-web", () => {
 
   test("prepareStaticWeb writes the customization asset and patches only referenced JS assets in place", async () => {
     const distDir = await makeTempDir("prepare-static-web-dist-")
-    await writeFile(path.join(distDir, "assets-app.js"), 'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
-    await writeFile(path.join(distDir, "unused.js"), 'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;')
+    await writeFile(
+      path.join(distDir, "assets-app.js"),
+      'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
+    )
+    await writeFile(
+      path.join(distDir, "unused.js"),
+      'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
+    )
 
     await writeFile(
       path.join(distDir, "index.html"),
@@ -74,10 +90,22 @@ describe("prepare-static-web", () => {
     const js = await readFile(path.join(distDir, "assets-app.js"), "utf8")
     const untouched = await readFile(path.join(distDir, "unused.js"), "utf8")
 
-    expect(html).toContain('/runtime-config.js')
+    expect(html).toContain("/runtime-config.js")
     expect(html).toContain(`/${customizationCssFileName}`)
     expect(css).toContain('[data-component="sidebar-rail"]')
-    expect(js).toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
-    expect(untouched).not.toContain('window.__OPENCODE_SERVER_URL||window.location.origin')
+    expect(js).toContain("window.__OPENCODE_SERVER_URL||window.location.origin")
+    expect(untouched).not.toContain("window.__OPENCODE_SERVER_URL||window.location.origin")
+  })
+
+  test("prepareStaticWeb fails when no referenced JS asset contains the expected runtime patch target", async () => {
+    const distDir = await makeTempDir("prepare-static-web-missing-patch-")
+
+    await writeFile(path.join(distDir, "assets-app.js"), 'const x="no runtime-sensitive URL logic here";')
+    await writeFile(
+      path.join(distDir, "index.html"),
+      '<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
+    )
+
+    await expect(prepareStaticWeb(distDir)).rejects.toThrow("Failed to patch getCurrentUrl fallback in built JS.")
   })
 })

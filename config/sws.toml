@@ -1,9 +1,6 @@
 [general]
-host = "0.0.0.0"
-port = 80
-root = "/home/sws/public"
-page-fallback = "/home/sws/public/index.html"
-cache-control-headers = true
+root = "/opt/opencode-web/public"
+page-fallback = "/opt/opencode-web/public/index.html"
 
 [[advanced.headers]]
 source = "/runtime-config.js"
