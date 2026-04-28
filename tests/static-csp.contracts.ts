@@ -1,7 +1,10 @@
+import { match } from "./core"
 import type { Contract } from "./core"
 
 const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/
 const staticWebCspPattern = /Content-Security-Policy\s*=\s*"([^"]+)"/
+const catchAllSourcePattern = /source\s*=\s*"\/\*\*"/
+const assetsSourcePattern = /source\s*=\s*"\/assets\/\*\*"/
 
 const connectSrcAdditions = ["http:", "https:", "ws:", "wss:"]
 const scriptSrcAdditions = ["'unsafe-inline'"]
@@ -93,6 +96,28 @@ export const staticCspContracts: Contract[] = [
           "expected config/sws.toml CSP to match upstream DEFAULT_CSP, plus this wrapper's extra base-uri/frame-ancestors/object-src directives and broader connect-src for external backends",
         test: matchesUpstreamStaticCsp,
       },
+    ],
+  },
+  {
+    area: "SPA fallback headers",
+    hint: 'If the catch-all header rule is removed, SPA routes like /session will be served without CSP or no-cache headers. Add it back with the same CSP as /index.html and Cache-Control: no-store. The /assets/** rule overrides with long-lived caching for hashed static assets.',
+    checks: [
+      match(
+        "staticWebConfig",
+        catchAllSourcePattern,
+        'expected config/sws.toml to contain a catch-all source = "/**" header rule for SPA fallback routes',
+      ),
+    ],
+  },
+  {
+    area: "hashed asset caching",
+    hint: "If the /assets/** rule is removed, hashed static assets will miss long-lived cache headers. Add it back with Cache-Control: public, max-age=31536000, immutable and the same CSP as the catch-all.",
+    checks: [
+      match(
+        "staticWebConfig",
+        assetsSourcePattern,
+        'expected config/sws.toml to contain a source = "/assets/**" header rule for hashed static assets with long-lived caching',
+      ),
     ],
   },
 ]
