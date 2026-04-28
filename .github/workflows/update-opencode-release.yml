@@ -56,6 +56,7 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
+        id: create-pr
         if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
@@ -69,3 +70,19 @@ jobs:
             - update the `opencode/` submodule to `${{ steps.release.outputs.tag }}`
             - keep OpenCode Web Docker aligned with the latest upstream OpenCode release
             - let the normal Docker workflow rebuild and publish the refreshed GHCR image after merge
+
+      # NOTE: Auto-merge only waits for checks if "main" branch protection
+      # requires status checks. Without required checks, auto-merge fires
+      # immediately. Also requires "Allow auto-merge" in repo Settings →
+      # General → Pull Requests. Both must be enabled for this to work.
+      - name: Approve pull request
+        if: steps.create-pr.outputs.pull-request-number != ''
+        run: gh pr review --approve "${{ steps.create-pr.outputs.pull-request-url }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.pull-request-number != ''
+        run: gh pr merge --auto --squash "${{ steps.create-pr.outputs.pull-request-url }}"
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
