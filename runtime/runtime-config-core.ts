@@ -15,8 +15,18 @@ function normalizeUrl(input: unknown): string {
   if (typeof input !== "string") return ""
   const trimmed = input.trim()
   if (!trimmed) return ""
-  const withProtocol = /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`
-  return withProtocol.replace(/\/+$/, "")
+  const match = /^(https?)(:\/\/.*)$/i.exec(trimmed)
+  const withProtocol = match ? `${match[1]!.toLowerCase()}${match[2]}` : `http://${trimmed}`
+  try {
+    const url = new URL(withProtocol)
+    url.hostname = url.hostname.toLowerCase()
+    return url.toString().replace(/\/+$/, "")
+  } catch {
+    const fallback = withProtocol.replace(/\/+$/, "")
+    const hostMatch = /^([a-z]+:\/\/)([^/]*?)(\/.*)?$/i.exec(fallback)
+    if (!hostMatch) return fallback
+    return `${hostMatch[1]!.toLowerCase()}${hostMatch[2]!.toLowerCase()}${hostMatch[3] ?? ""}`
+  }
 }
 
 function readState(deps: RuntimeConfigDeps): { raw: string | null; state: ServerState } {

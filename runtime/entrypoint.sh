@@ -25,12 +25,34 @@ normalize_url() {
     return
   fi
 
-  case "$trimmed" in
-    http://*|https://*) with_scheme="$trimmed" ;;
-    *) with_scheme="http://$trimmed" ;;
+  lower="$(printf '%s' "$trimmed" | tr 'A-Z' 'a-z')"
+  case "$lower" in
+    http://*|https://*)
+      scheme="$(printf '%s' "$trimmed" | sed 's|://.*||' | tr 'A-Z' 'a-z')"
+      rest="$(printf '%s' "$trimmed" | sed 's|^[^:]*://||')"
+      ;;
+    *)
+      scheme="http"
+      rest="$trimmed"
+      ;;
   esac
 
-  printf '%s' "$with_scheme" | sed 's:/*$::'
+  rest_no_scheme="$rest"
+  authority="$(printf '%s' "$rest_no_scheme" | sed 's|/.*$||')"
+  host="$(printf '%s' "$authority" | sed 's|:.*$||' | tr 'A-Z' 'a-z')"
+  if [ -z "$host" ]; then
+    printf '%s' ""
+    return
+  fi
+
+  result="${scheme}://${host}"
+  case "$authority" in
+    *:*) result="${result}:$(printf '%s' "$authority" | sed 's|^[^:]*:||')" ;;
+  esac
+  case "$rest_no_scheme" in
+    */*) result="${result}$(printf '%s' "$rest_no_scheme" | sed 's|[^/]*||')" ;;
+  esac
+  printf '%s' "$result" | sed 's:/*$::'
 }
 
 encode_base64() {
@@ -129,7 +151,8 @@ esac
 server_entries=""
 index=1
 while [ "$index" -le "$max_index" ]; do
-  url_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_URL")")"
+  url_value="$(printf '%s\n' "$normalized_urls" | sed -n "${index}p")"
+  url_b64="$(encode_base64 "$url_value")"
   name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
   username_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
   password_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"

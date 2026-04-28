@@ -206,6 +206,22 @@ expect_failure \
     "$image_tag" \
     true
 
+expect_failure \
+  "reject URL with empty host after scheme" \
+  "OPENCODE_SERVER_1_URL is required and must not be empty after normalization." \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL='http://' \
+    "$image_tag" \
+    true
+
+expect_failure \
+  "reject URL with empty host after https scheme" \
+  "OPENCODE_SERVER_1_URL is required and must not be empty after normalization." \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL='https://' \
+    "$image_tag" \
+    true
+
 multiline_env_value="$(printf 'before\nOPENCODE_SERVER_9_URL\nafter')"
 
 expect_final_image_layout \
@@ -276,5 +292,54 @@ expect_generated_runtime_config_parses \
     -e OPENCODE_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
     sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+
+expect_generated_runtime_config_applies \
+  "normalizes uppercase scheme and hostname to lowercase" \
+  "OpenCode" \
+  "https://api1.example.com" \
+  "https://api2.example.com" \
+  '[{"url":"https://api1.example.com","name":"","username":"","password":""},{"url":"https://api2.example.com","name":"","username":"","password":""}]' \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=HTTPS://API1.EXAMPLE.COM \
+    -e OPENCODE_SERVER_2_URL=HTTPS://API2.EXAMPLE.COM/ \
+    -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
+    "$image_tag" \
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+
+expect_generated_runtime_config_applies \
+  "preserves URL path case while normalizing scheme and host" \
+  "OpenCode" \
+  "https://api.example.com/pAtH" \
+  "https://api.example.com/pAtH" \
+  '[{"url":"https://api.example.com/pAtH","name":"","username":"","password":""}]' \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=HTTPS://API.EXAMPLE.COM/pAtH \
+    "$image_tag" \
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+
+expect_generated_runtime_config_applies \
+  "preserves port while normalizing scheme and host" \
+  "OpenCode" \
+  "http://api.example.com:8080" \
+  "http://api.example.com:8080" \
+  '[{"url":"http://api.example.com:8080","name":"","username":"","password":""}]' \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=HTTP://API.EXAMPLE.COM:8080 \
+    "$image_tag" \
+    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+
+expect_success \
+  "SPA fallback route has no-cache and CSP headers" \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=http://api1.example.com \
+    "$image_tag" \
+    sh -lc 'headers="$(wget -qS -O /dev/null http://127.0.0.1:8080/some/spa/route 2>&1)" && printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
+
+expect_success \
+  "hashed assets have long-lived cache headers" \
+  docker run --rm \
+    -e OPENCODE_SERVER_1_URL=http://api1.example.com \
+    "$image_tag" \
+    sh -lc 'asset="$(ls /opt/opencode-web/public/assets/ | head -1)" && headers="$(wget -qS -O /dev/null "http://127.0.0.1:8080/assets/$asset" 2>&1)" && printf "%s\n" "$headers" | grep -qi "cache-control.*immutable" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
 
 printf '==> All runtime-config regression checks passed\n'

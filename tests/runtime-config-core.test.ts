@@ -410,6 +410,66 @@ describe("runtime-config-core", () => {
     expect(result.document.title).toBe("My Hosted OpenCode")
   })
 
+  test("normalizes uppercase scheme and hostname to lowercase", () => {
+    const result = runWithDeps({
+      configuredServers: [
+        {
+          url: encodeBase64("HTTPS://API1.EXAMPLE.COM"),
+          name: encodeBase64(""),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      storage: {
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    expect(saved.list[0].http.url).toBe("https://api1.example.com")
+    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://api1.example.com")
+  })
+
+  test("lowercases scheme and host but preserves path case", () => {
+    const result = runWithDeps({
+      configuredServers: [
+        {
+          url: encodeBase64("HTTPS://API.EXAMPLE.COM/pAtH"),
+          name: encodeBase64(""),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      storage: {
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    expect(saved.list[0].http.url).toBe("https://api.example.com/pAtH")
+    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://api.example.com/pAtH")
+  })
+
+  test("preserves port while normalizing scheme and host", () => {
+    const result = runWithDeps({
+      configuredServers: [
+        {
+          url: encodeBase64("HTTP://API.EXAMPLE.COM:8080"),
+          name: encodeBase64(""),
+          username: encodeBase64(""),
+          password: encodeBase64(""),
+        },
+      ],
+      storage: {
+        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+      },
+    })
+
+    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    expect(saved.list[0].http.url).toBe("http://api.example.com:8080")
+    expect(result.window.__OPENCODE_SERVER_URL).toBe("http://api.example.com:8080")
+  })
+
   test("bundled runtime artifact executes correctly with unicode metadata", async () => {
     const result = await runBundledRuntimeConfig({
       forceDefaultMode: "force",
