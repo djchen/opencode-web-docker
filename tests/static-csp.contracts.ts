@@ -100,7 +100,7 @@ export const staticCspContracts: Contract[] = [
   },
   {
     area: "SPA fallback headers",
-    hint: 'If the catch-all header rule is removed, SPA routes like /session will be served without CSP or no-cache headers. Add it back with the same CSP as /index.html and Cache-Control: no-store. The /assets/** rule overrides with long-lived caching for hashed static assets.',
+    hint: "If the catch-all header rule is removed, SPA routes like /session will be served without CSP or no-cache headers. Add it back with the same CSP as /index.html and Cache-Control: no-store. The /assets/** rule overrides with long-lived caching for hashed static assets.",
     checks: [
       match(
         "staticWebConfig",
