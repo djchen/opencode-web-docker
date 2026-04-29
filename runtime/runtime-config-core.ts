@@ -20,7 +20,7 @@ function normalizeUrl(input: unknown): string {
     const parsed = new URL(withProtocol)
     parsed.protocol = parsed.protocol.toLowerCase()
     parsed.hostname = parsed.hostname.toLowerCase()
-    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || parsed.pathname
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "")
     return parsed.toString().replace(/\/+$/, "")
   } catch {
     return withProtocol.replace(/\/+$/, "")

@@ -37,8 +37,7 @@ normalize_url() {
       ;;
   esac
 
-  rest_no_scheme="$rest"
-  authority="$(printf '%s' "$rest_no_scheme" | sed 's|/.*$||')"
+  authority="$(printf '%s' "$rest" | sed 's|/.*$||')"
   host="$(printf '%s' "$authority" | sed 's|:.*$||' | tr 'A-Z' 'a-z')"
   if [ -z "$host" ]; then
     printf '%s' ""
@@ -49,8 +48,8 @@ normalize_url() {
   case "$authority" in
     *:*) result="${result}:$(printf '%s' "$authority" | sed 's|^[^:]*:||')" ;;
   esac
-  case "$rest_no_scheme" in
-    */*) result="${result}$(printf '%s' "$rest_no_scheme" | sed 's|[^/]*||')" ;;
+  case "$rest" in
+    */*) result="${result}$(printf '%s' "$rest" | sed 's|[^/]*||')" ;;
   esac
   printf '%s' "$result" | sed 's:/*$::'
 }
