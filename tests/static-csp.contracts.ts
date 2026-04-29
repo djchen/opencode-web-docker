@@ -2,9 +2,44 @@ import { match } from "./core"
 import type { Contract } from "./core"
 
 const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/
-const staticWebCspPattern = /Content-Security-Policy\s*=\s*"([^"]+)"/
-const catchAllSourcePattern = /source\s*=\s*"\/\*\*"/
-const assetsSourcePattern = /source\s*=\s*"\/assets\/\*\*"/
+const headerRulePattern =
+  /\[\[advanced\.headers\]\]\s*source\s*=\s*"([^"]+)"\s*\[advanced\.headers\.headers\]\s*([\s\S]*?)(?=\n\[\[advanced\.headers\]\]|\s*$)/g
+const headerValuePattern = /^([A-Za-z-]+)\s*=\s*"([^"]*)"$/gm
+const catchAllSource = "/**"
+const assetsSource = "/assets/**"
+const noStoreCacheControl = "no-store, no-cache, must-revalidate"
+const immutableCacheControl = "public, max-age=31536000, immutable"
+
+export interface StaticWebHeaderRule {
+  source: string
+  headers: Record<string, string>
+}
+
+export function parseStaticWebHeaderRules(source: string): StaticWebHeaderRule[] {
+  return [...source.matchAll(headerRulePattern)].map((match) => {
+    const headers: Record<string, string> = {}
+    for (const header of match[2]!.matchAll(headerValuePattern)) {
+      headers[header[1]!] = header[2]!
+    }
+
+    return { source: match[1]!, headers }
+  })
+}
+
+function getHeaderRule(source: string, ruleSource: string): StaticWebHeaderRule | undefined {
+  return parseStaticWebHeaderRules(source).find((rule) => rule.source === ruleSource)
+}
+
+function headerValueEquals(source: string, ruleSource: string, headerName: string, expected: string): boolean {
+  return getHeaderRule(source, ruleSource)?.headers[headerName] === expected
+}
+
+function assetsRuleFollowsCatchAll(source: string): boolean {
+  const rules = parseStaticWebHeaderRules(source)
+  const catchAllIndex = rules.findIndex((rule) => rule.source === catchAllSource)
+  const assetsIndex = rules.findIndex((rule) => rule.source === assetsSource)
+  return catchAllIndex !== -1 && assetsIndex !== -1 && assetsIndex > catchAllIndex
+}
 
 const connectSrcAdditions = ["http:", "https:", "ws:", "wss:"]
 const scriptSrcAdditions = ["'unsafe-inline'"]
@@ -26,9 +61,9 @@ function extractUpstreamDefaultCsp(source: string): string {
 }
 
 function extractStaticWebCsp(source: string): string {
-  const cspMatch = source.match(staticWebCspPattern)
-  if (!cspMatch) throw new Error("Could not locate Content-Security-Policy in config/sws.toml")
-  return cspMatch[1]!
+  const csp = getHeaderRule(source, catchAllSource)?.headers["Content-Security-Policy"]
+  if (!csp) throw new Error(`Could not locate Content-Security-Policy for ${catchAllSource} in config/sws.toml`)
+  return csp
 }
 
 function parseCsp(csp: string): Map<string, string[]> {
@@ -85,6 +120,13 @@ export function matchesUpstreamStaticCsp(files: Record<string, string>): boolean
   )
 }
 
+function assetsCspMatchesCatchAll(files: Record<string, string>): boolean {
+  const staticWebConfig = files["staticWebConfig"]!
+  const catchAllCsp = getHeaderRule(staticWebConfig, catchAllSource)?.headers["Content-Security-Policy"]
+  const assetsCsp = getHeaderRule(staticWebConfig, assetsSource)?.headers["Content-Security-Policy"]
+  return !!catchAllCsp && assetsCsp === catchAllCsp
+}
+
 export const staticCspContracts: Contract[] = [
   {
     area: "static-web CSP",
@@ -96,6 +138,11 @@ export const staticCspContracts: Contract[] = [
           "expected config/sws.toml CSP to match upstream DEFAULT_CSP, plus this wrapper's extra base-uri/frame-ancestors/object-src directives and broader connect-src for external backends",
         test: matchesUpstreamStaticCsp,
       },
+      {
+        file: "staticWebConfig",
+        message: "expected /assets/** CSP to match the catch-all /** CSP",
+        test: assetsCspMatchesCatchAll,
+      },
     ],
   },
   {
@@ -104,20 +151,38 @@ export const staticCspContracts: Contract[] = [
     checks: [
       match(
         "staticWebConfig",
-        catchAllSourcePattern,
+        /source\s*=\s*"\/\*\*"/,
         'expected config/sws.toml to contain a catch-all source = "/**" header rule for SPA fallback routes',
       ),
+      {
+        file: "staticWebConfig",
+        message: `expected catch-all /** header rule to set Cache-Control = "${noStoreCacheControl}"`,
+        test: (files) =>
+          headerValueEquals(files["staticWebConfig"]!, catchAllSource, "Cache-Control", noStoreCacheControl),
+      },
     ],
   },
   {
     area: "hashed asset caching",
-    hint: "If the /assets/** rule is removed, hashed static assets will miss long-lived cache headers. Add it back with Cache-Control: public, max-age=31536000, immutable and the same CSP as the catch-all.",
+    hint: "If the /assets/** rule is removed, hashed static assets will miss long-lived cache headers. Add it back with Cache-Control: public, max-age=31536000, immutable and the same CSP as the catch-all. The /assets/** rule must come after the catch-all /** because static-web-server uses last-match-wins for header rules.",
     checks: [
       match(
         "staticWebConfig",
-        assetsSourcePattern,
+        /source\s*=\s*"\/assets\/\*\*"/,
         'expected config/sws.toml to contain a source = "/assets/**" header rule for hashed static assets with long-lived caching',
       ),
+      {
+        file: "staticWebConfig",
+        message: `expected /assets/** header rule to set Cache-Control = "${immutableCacheControl}"`,
+        test: (files) =>
+          headerValueEquals(files["staticWebConfig"]!, assetsSource, "Cache-Control", immutableCacheControl),
+      },
+      {
+        file: "staticWebConfig",
+        message:
+          "expected config/sws.toml to define the /assets/** header rule after the catch-all /** rule (static-web-server uses last-match-wins)",
+        test: (files) => assetsRuleFollowsCatchAll(files["staticWebConfig"]!),
+      },
     ],
   },
 ]
