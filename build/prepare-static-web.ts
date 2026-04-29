@@ -66,8 +66,15 @@ export function patchBuiltJs(content: string): PatchResult {
 }
 
 function resolveAssetPath(rootDir: string, assetPath: string): string {
-  if (assetPath.startsWith("/")) return path.join(rootDir, assetPath.slice(1))
-  return path.resolve(rootDir, assetPath)
+  const root = path.resolve(rootDir)
+  const filePath = assetPath.startsWith("/") ? path.join(root, assetPath.slice(1)) : path.resolve(root, assetPath)
+  const relativePath = path.relative(root, filePath)
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(`Referenced JS asset escapes dist dir: ${assetPath}`)
+  }
+
+  return filePath
 }
 
 export async function prepareStaticWeb(distDir: string): Promise<void> {
