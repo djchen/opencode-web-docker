@@ -1,55 +1,38 @@
-**Workspace**
+## Workspace
 
-- Repo root packages a self-hosted static web deployment around upstream OpenCode.
-- `opencode/` is a git submodule pointing at `https://github.com/anomalyco/opencode.git`.
-- Do not modify files under `opencode/`. Treat upstream code as read-only. The only upstream change allowed here is updating the submodule pointer.
-- Root changes belong in the repo root, `build/`, `runtime/`, `config/`, or `scripts/`.
-- When inspecting upstream code for context, read the closest `AGENTS.md` inside `opencode/`.
-- Runtime code lives in `runtime/*.ts` and is bundled into `dist/runtime/runtime-bundle.js` by `build/transpile-runtime.ts`.
+- This repo owns the static-web wrapper only. `opencode/` is an upstream git submodule; do not edit files under it here. The only allowed upstream change is moving the submodule pointer.
+- Root-owned code lives in `build/`, `runtime/`, `config/`, `scripts/`, and `tests/`.
+- If you need upstream context, read the closest `AGENTS.md` inside `opencode/` first.
 
-**Commands**
+## Entry Points
+
+- `Dockerfile` is the real integration path: it runs `build/check-runtime-config-compat.ts`, bundles `runtime/index.ts`, builds `opencode/packages/app`, patches the built app with `build/prepare-static-web.ts`, then serves it with `static-web-server`.
+- `runtime/entrypoint.sh` is the runtime source of truth. It validates `OPENCODE_SERVER_<N>_*`, requires contiguous unpadded indexes starting at `1`, normalizes URLs, writes `/public/runtime-config.js`, and seeds browser localStorage.
+- `build/prepare-static-web.ts` injects `/runtime-config.js` and `opencode-web-customizations.css` into `index.html`, then patches built JS so the app uses `window.__OPENCODE_SERVER_URL` instead of `location.origin`.
+- `config/sws.toml` is part of the contract: `index.html` and `/runtime-config.js` must stay `no-store`, while `/assets/**` stays long-lived and immutable.
+
+## Compatibility Contracts
+
+- Root `bun test` runs only `./tests` because `bunfig.toml` sets `[test].root = "./tests"`.
+- `tests/*.contracts.ts` encode every assumption this wrapper makes about upstream app internals. If upstream changes break the wrapper, update the contract and the wrapper code together.
+- `bun ./build/check-runtime-config-compat.ts` is the same upstream-compat guard used during `docker build`.
+
+## Commands
 
 - First-time setup: `git submodule update --init --recursive`
-- Build Docker image: `docker build -t opencode-web-docker .` or `bun run docker:build`
-- Published image: `ghcr.io/djchen/opencode-web-docker` (`linux/amd64`, `linux/arm64`)
-- Quick upstream app build check: `bun run --cwd opencode/packages/app build`
-- Build runtime bundle: `bun run build:runtime`
-- Tests: `bun test`
-- Typecheck: `bun run typecheck`
-- Lint: `bun run lint`
-- Format: `bun run format`
-- Format check: `bun run format:check`
-- Runtime regression check: `./scripts/test-runtime-config.sh --build`
+- Root verification after edits: `bun test && bun run typecheck && bun run lint && bun run format:check`
+- Apply formatting: `bun run format`
+- Runtime bundle only: `bun run build:runtime`
+- Focused root tests: `bun test tests/runtime-config-core.test.ts`, `bun test tests/prepare-static-web.test.ts`, `bun test tests/static-csp.test.ts`
+- Runtime/image regression check: `./scripts/test-runtime-config.sh --build`
+- End-to-end build: `docker build -t opencode-web-docker .`
+- Quick upstream app build smoke check: `bun run --cwd opencode/packages/app build`
 - Update upstream submodule: `./scripts/update-opencode-release.sh [tag]` or `bun run upstream:update`
 
-**Root CI**
+## Gotchas
 
-- `ci-lint.yml` runs on pull requests to `main`, pushes to `main`, and manual dispatch. It builds the Docker image, runs runtime regression checks on pull requests, then runs tests, typecheck, lint, format checks, `actionlint`, and `shellcheck` on repo-owned `*.sh` files.
-- `docker-publish.yml` runs on `main` pushes, `v*` tags, and manual dispatch. It publishes multi-platform images to GHCR.
-- `update-opencode-release.yml` runs daily or on manual dispatch to update the submodule and open a PR.
-
-**Static Web Flow**
-
-- `Dockerfile` builds upstream `opencode/packages/app` and serves the result with `static-web-server`.
-- `build/prepare-static-web.ts` injects `/runtime-config.js` and the repo stylesheet into `index.html`, then patches the built frontend so it reads `window.__OPENCODE_SERVER_URL` instead of falling back to `location.origin`.
-- `build/check-runtime-config-compat.ts` guards the local patches against upstream persistence changes during Docker builds.
-- `build/transpile-runtime.ts` bundles `runtime/index.ts` into `dist/runtime/runtime-bundle.js`.
-- `runtime/entrypoint.sh` serializes env vars safely into `/runtime-config.js`, writes configured servers into localStorage, supports `OPENCODE_FORCE_DEFAULT_SERVER`, and removes `location.origin` when it is not configured.
-- `config/sws.toml` disables caching for `/runtime-config.js` and `/index.html`.
-- A separate `opencode serve` instance must handle the API and allow the app origin with `--cors`.
-- Security: `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written into browser localStorage. Do not set them for public deployments.
-
-**Upstream OpenCode**
-
-- The upstream default branch and CI base branch are `dev`, not `main`.
-- Bun version is pinned in both `package.json` and `Dockerfile`; keep them in sync.
-- Primary root verification is `docker build -t opencode-web-docker .`. Focused repo checks are `bun test`, `bun run typecheck`, `bun run lint`, `bun run format:check`, and `./scripts/test-runtime-config.sh --build`.
-- Upstream typecheck: `cd opencode && bun typecheck`
-- Do not run `cd opencode && bun test`; it intentionally fails. Use focused package tests such as `cd opencode/packages/opencode && bun test` or `cd opencode/packages/app && bun test:unit`.
-- For local browser UI work, run the backend from `opencode/packages/opencode` with `cd opencode/packages/opencode && bun run --conditions=browser ./src/index.ts serve --port 4096`, run the app from `opencode/packages/app` with `cd opencode/packages/app && bun dev -- --port 4444`, and use `http://localhost:4444`.
-
-**Local Docker Cleanup**
-
-- Remove the project image: `docker rmi opencode-web-docker`
-- Remove stopped containers, dangling images, and build cache: `docker system prune`
-- Remove build cache only: `docker builder prune`
+- CI workflow is `.github/workflows/ci.yml`; it also runs `actionlint` and `shellcheck` on repo-owned workflows and `*.sh` files.
+- Root `lint` and `format` scripts only cover `build/`, `runtime/`, and `tests/`; edits in `scripts/`, `config/`, or `.github/workflows/` are not covered by those commands.
+- `package.json` and `Dockerfile` both pin Bun `1.3.13`; keep them in sync.
+- Upstream OpenCode’s default branch is `dev`, not `main`.
+- `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written to browser localStorage. Do not use them for public deployments.

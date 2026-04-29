@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildExpectedStaticWebCsp } from "./static-csp.contracts"
+import { buildExpectedStaticWebCsp, parseStaticWebHeaderRules } from "./static-csp.contracts"
 
 describe("static CSP compatibility", () => {
   test("adds only deployment-specific directives to upstream CSP", () => {
@@ -24,5 +24,38 @@ describe("static CSP compatibility", () => {
     expect(expected.get("frame-ancestors")).toEqual(["'self'"])
     expect(expected.get("object-src")).toEqual(["'self'"])
     expect(expected.get("connect-src")).toEqual(["'self'", "data:", "http:", "https:", "ws:", "wss:"])
+  })
+
+  test("parses static-web header rules by source", () => {
+    const rules = parseStaticWebHeaderRules(`
+[[advanced.headers]]
+source = "/**"
+
+[advanced.headers.headers]
+Cache-Control = "no-store"
+Content-Security-Policy = "default-src 'self'"
+
+[[advanced.headers]]
+source = "/assets/**"
+
+[advanced.headers.headers]
+Cache-Control = "public, max-age=31536000, immutable"
+`)
+
+    expect(rules).toEqual([
+      {
+        source: "/**",
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Security-Policy": "default-src 'self'",
+        },
+      },
+      {
+        source: "/assets/**",
+        headers: {
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      },
+    ])
   })
 })

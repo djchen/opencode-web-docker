@@ -108,4 +108,15 @@ describe("prepare-static-web", () => {
 
     await expect(prepareStaticWeb(distDir)).rejects.toThrow("Failed to patch getCurrentUrl fallback in built JS.")
   })
+
+  test("prepareStaticWeb rejects referenced JS assets outside the dist directory", async () => {
+    const distDir = await makeTempDir("prepare-static-web-escaped-asset-")
+
+    await writeFile(
+      path.join(distDir, "index.html"),
+      '<html><head><script type="module" src="../outside.js"></script></head><body></body></html>',
+    )
+
+    await expect(prepareStaticWeb(distDir)).rejects.toThrow("Referenced JS asset escapes dist dir: ../outside.js")
+  })
 })
