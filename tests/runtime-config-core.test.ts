@@ -11,6 +11,27 @@ const serverStoreKey = "opencode.global.dat:server"
 const defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
 
 const encodeBase64 = (value: string): string => Buffer.from(value, "utf8").toString("base64")
+const emptyServerState = () => ({ list: [], projects: {}, lastProject: {} })
+const emptyServerStateRaw = () => JSON.stringify(emptyServerState())
+
+function configuredServer(input: { url: string; name?: string; username?: string; password?: string }) {
+  return {
+    url: encodeBase64(input.url),
+    name: encodeBase64(input.name ?? ""),
+    username: encodeBase64(input.username ?? ""),
+    password: encodeBase64(input.password ?? ""),
+  }
+}
+
+function savedServerState(result: ReturnType<typeof runWithDeps>) {
+  return JSON.parse(result.storage.get(serverStoreKey)!)
+}
+
+function savedServerUrls(result: ReturnType<typeof runWithDeps>): string[] {
+  return savedServerState(result).list.map(
+    (item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url,
+  )
+}
 
 let bundleDir: string | undefined
 let bundledRuntimeSourcePromise: Promise<string> | undefined
@@ -196,28 +217,18 @@ describe("runtime-config-core", () => {
       forceDefaultMode: "force",
       configuredDefaultIndex: 2,
       configuredServers: [
-        {
-          url: encodeBase64("http://persisted.example.com"),
-          name: encodeBase64("Renamed"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-        {
-          url: encodeBase64("https://api2.example.com/"),
-          name: encodeBase64("Server 2"),
-          username: encodeBase64("alice"),
-          password: encodeBase64("secret"),
-        },
+        configuredServer({ url: "http://persisted.example.com", name: "Renamed" }),
+        configuredServer({ url: "https://api2.example.com/", name: "Server 2", username: "alice", password: "secret" }),
       ],
       storage: {
         [serverStoreKey]: JSON.stringify(state),
       },
     })
 
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    const saved = savedServerState(result)
     expect(saved.projects).toEqual(state.projects)
     expect(saved.lastProject).toEqual(state.lastProject)
-    expect(saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)).toEqual([
+    expect(savedServerUrls(result)).toEqual([
       "http://persisted.example.com",
       "https://api2.example.com",
       "http://custom.example.com",
@@ -237,22 +248,12 @@ describe("runtime-config-core", () => {
       forceDefaultMode: "preserve",
       configuredDefaultIndex: 1,
       configuredServers: [
-        {
-          url: encodeBase64("http://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-        {
-          url: encodeBase64("http://api2.example.com"),
-          name: encodeBase64("Server 2"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
+        configuredServer({ url: "http://api1.example.com", name: "Server 1" }),
+        configuredServer({ url: "http://api2.example.com", name: "Server 2" }),
       ],
       storage: {
         [defaultServerUrlKey]: "http://api2.example.com",
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
     })
 
@@ -266,31 +267,21 @@ describe("runtime-config-core", () => {
       forceDefaultMode: "preserve",
       configuredDefaultIndex: 1,
       configuredServers: [
-        {
-          url: encodeBase64("https://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-        {
-          url: encodeBase64("https://api2.example.com"),
-          name: encodeBase64("Server 2"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
+        configuredServer({ url: "https://api1.example.com", name: "Server 1" }),
+        configuredServer({ url: "https://api2.example.com", name: "Server 2" }),
       ],
       storage: {
         [defaultServerUrlKey]: "https://api2.example.com/",
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
     })
 
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
-    const savedUrls = saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)
+    const savedUrls = savedServerUrls(result)
+    const defaultServerUrl = result.storage.get(defaultServerUrlKey)
 
     expect(savedUrls).toEqual(["https://api1.example.com", "https://api2.example.com"])
-    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api2.example.com")
-    expect(savedUrls).toContain(result.storage.get(defaultServerUrlKey))
+    expect(defaultServerUrl).toBe("https://api2.example.com")
+    expect(savedUrls).toContain(defaultServerUrl!)
   })
 
   test("skips localStorage writes when the effective config is unchanged", () => {
@@ -306,14 +297,7 @@ describe("runtime-config-core", () => {
     const result = runWithDeps({
       forceDefaultMode: "force",
       configuredDefaultIndex: 1,
-      configuredServers: [
-        {
-          url: encodeBase64("http://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
+      configuredServers: [configuredServer({ url: "http://api1.example.com", name: "Server 1" })],
       storage: {
         [defaultServerUrlKey]: "http://api1.example.com",
         [serverStoreKey]: JSON.stringify(state),
@@ -328,14 +312,7 @@ describe("runtime-config-core", () => {
     const result = runWithDeps({
       forceDefaultMode: "preserve",
       configuredDefaultIndex: 1,
-      configuredServers: [
-        {
-          url: encodeBase64("http://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
+      configuredServers: [configuredServer({ url: "http://api1.example.com", name: "Server 1" })],
       storage: {
         [defaultServerUrlKey]: "http://frontend.example.com",
         [serverStoreKey]: JSON.stringify({
@@ -349,33 +326,35 @@ describe("runtime-config-core", () => {
       },
     })
 
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
-    expect(saved.list.map((item: { http?: { url: string }; url?: string }) => item.http?.url ?? item.url)).toEqual([
-      "http://api1.example.com",
-      "http://custom.example.com",
-    ])
+    expect(savedServerUrls(result)).toEqual(["http://api1.example.com", "http://custom.example.com"])
     expect(result.storage.get(defaultServerUrlKey)).toBe("http://api1.example.com")
   })
 
   test("warns and recovers from an incompatible persisted store", () => {
     const result = runWithDeps({
-      configuredServers: [
-        {
-          url: encodeBase64("http://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
+      configuredServers: [configuredServer({ url: "http://api1.example.com", name: "Server 1" })],
       storage: {
         [serverStoreKey]: JSON.stringify({ list: {}, projects: null, lastProject: "broken" }),
       },
     })
 
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
+    const saved = savedServerState(result)
     expect(saved.list).toHaveLength(1)
     expect(saved.projects).toEqual({})
     expect(saved.lastProject).toEqual({})
+    expect(result.warnings.length).toBeGreaterThan(0)
+  })
+
+  test("warns and recovers from malformed persisted JSON", () => {
+    const result = runWithDeps({
+      configuredServers: [configuredServer({ url: "http://api1.example.com", name: "Server 1" })],
+      storage: {
+        [serverStoreKey]: "not json",
+      },
+    })
+
+    expect(savedServerUrls(result)).toEqual(["http://api1.example.com"])
+    expect(savedServerState(result).projects).toEqual({})
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
@@ -383,7 +362,7 @@ describe("runtime-config-core", () => {
     const result = runWithDeps({
       configuredServers: [],
       storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
     })
 
@@ -393,16 +372,9 @@ describe("runtime-config-core", () => {
 
   test("sets document.title when appTitle is configured", () => {
     const result = runWithDeps({
-      configuredServers: [
-        {
-          url: encodeBase64("http://api1.example.com"),
-          name: encodeBase64("Server 1"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
+      configuredServers: [configuredServer({ url: "http://api1.example.com", name: "Server 1" })],
       storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
       appTitle: encodeBase64("My Hosted OpenCode"),
     })
@@ -410,87 +382,60 @@ describe("runtime-config-core", () => {
     expect(result.document.title).toBe("My Hosted OpenCode")
   })
 
-  test("normalizes uppercase scheme and hostname to lowercase", () => {
+  test("sets document.title even when there are no configured servers", () => {
     const result = runWithDeps({
-      configuredServers: [
-        {
-          url: encodeBase64("HTTPS://API1.EXAMPLE.COM"),
-          name: encodeBase64(""),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
+      configuredServers: [],
       storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
+      appTitle: encodeBase64("My Hosted OpenCode"),
     })
 
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
-    expect(saved.list[0].http.url).toBe("https://api1.example.com")
-    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://api1.example.com")
+    expect(result.document.title).toBe("My Hosted OpenCode")
+    expect(result.setCalls).toHaveLength(0)
   })
 
-  test("lowercases scheme and host but preserves path case", () => {
-    const result = runWithDeps({
-      configuredServers: [
-        {
-          url: encodeBase64("HTTPS://API.EXAMPLE.COM/pAtH"),
-          name: encodeBase64(""),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
+  for (const testCase of [
+    {
+      name: "normalizes uppercase scheme and hostname to lowercase",
+      inputUrl: "HTTPS://API1.EXAMPLE.COM",
+      expectedUrl: "https://api1.example.com",
+    },
+    {
+      name: "lowercases scheme and host but preserves path case",
+      inputUrl: "HTTPS://API.EXAMPLE.COM/pAtH",
+      expectedUrl: "https://api.example.com/pAtH",
+    },
+    {
+      name: "preserves port while normalizing scheme and host",
+      inputUrl: "HTTP://API.EXAMPLE.COM:8080",
+      expectedUrl: "http://api.example.com:8080",
+    },
+  ]) {
+    test(testCase.name, () => {
+      const result = runWithDeps({
+        configuredServers: [configuredServer({ url: testCase.inputUrl })],
+        storage: {
+          [serverStoreKey]: emptyServerStateRaw(),
         },
-      ],
-      storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
-      },
+      })
+
+      expect(savedServerUrls(result)).toEqual([testCase.expectedUrl])
+      expect(result.window.__OPENCODE_SERVER_URL).toBe(testCase.expectedUrl)
     })
-
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
-    expect(saved.list[0].http.url).toBe("https://api.example.com/pAtH")
-    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://api.example.com/pAtH")
-  })
-
-  test("preserves port while normalizing scheme and host", () => {
-    const result = runWithDeps({
-      configuredServers: [
-        {
-          url: encodeBase64("HTTP://API.EXAMPLE.COM:8080"),
-          name: encodeBase64(""),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
-      ],
-      storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
-      },
-    })
-
-    const saved = JSON.parse(result.storage.get(serverStoreKey)!)
-    expect(saved.list[0].http.url).toBe("http://api.example.com:8080")
-    expect(result.window.__OPENCODE_SERVER_URL).toBe("http://api.example.com:8080")
-  })
+  }
 
   test("bundled runtime artifact executes correctly with unicode metadata", async () => {
     const result = await runBundledRuntimeConfig({
       forceDefaultMode: "force",
       configuredDefaultIndex: 2,
       configuredServers: [
-        {
-          url: encodeBase64("https://api1.example.com"),
-          name: encodeBase64("München"),
-          username: encodeBase64("álîcè"),
-          password: encodeBase64("pässwörd"),
-        },
-        {
-          url: encodeBase64("https://api2.example.com/"),
-          name: encodeBase64("東京"),
-          username: encodeBase64(""),
-          password: encodeBase64(""),
-        },
+        configuredServer({ url: "https://api1.example.com", name: "München", username: "álîcè", password: "pässwörd" }),
+        configuredServer({ url: "https://api2.example.com/", name: "東京" }),
       ],
       appTitle: encodeBase64("你好 OpenCode"),
       storage: {
-        [serverStoreKey]: JSON.stringify({ list: [], projects: {}, lastProject: {} }),
+        [serverStoreKey]: emptyServerStateRaw(),
       },
     })
 
