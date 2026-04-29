@@ -53,6 +53,8 @@ WORKDIR /opt/opencode-web
 
 COPY --chown=sws:sws --from=build /opt/opencode-web/release/ ./
 
+EXPOSE 80
+
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1/index.html || exit 1
 
