@@ -333,8 +333,8 @@ expect_success \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=http://api1.example.com \
     "$image_tag" \
-    sh -lc 'static-web-server -w /opt/opencode-web/config/sws.toml &
-      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/ && break; sleep 1; done
+    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml &
+      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/ 2>/dev/null && break; sleep 1; done'
       wget -q --spider http://127.0.0.1/
       headers="$(wget -qS -O /dev/null http://127.0.0.1/some/spa/route 2>&1)"
       printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
@@ -344,11 +344,11 @@ expect_success \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=http://api1.example.com \
     "$image_tag" \
-    sh -lc 'static-web-server -w /opt/opencode-web/config/sws.toml &
-      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/ && break; sleep 1; done
+    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml &
+      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/ 2>/dev/null && break; sleep 1; done
       wget -q --spider http://127.0.0.1/
-      asset="$(ls /opt/opencode-web/public/assets/ | head -1)"
+      set -- /opt/opencode-web/public/assets/*
+      asset="${1##*/}"
       headers="$(wget -qS -O /dev/null "http://127.0.0.1/assets/$asset" 2>&1)"
       printf "%s\n" "$headers" | grep -qi "cache-control.*immutable" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
-
 printf '==> All runtime-config regression checks passed\n'
