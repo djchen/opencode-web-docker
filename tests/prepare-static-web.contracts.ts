@@ -97,8 +97,13 @@ export const prepareStaticWebContracts: Contract[] = [
       ),
       every(
         "tabs",
-        [/data-slot="tabs-list"/, /data-slot="tabs-trigger-wrapper"/, /data-slot="tabs-trigger"/],
-        'expected Tabs to keep exposing data-slot="tabs-list", data-slot="tabs-trigger-wrapper", and data-slot="tabs-trigger" (used by prepare-static-web.ts mobile header CSS)',
+        [
+          /data-component="tabs"/,
+          /data-slot="tabs-list"/,
+          /data-slot="tabs-trigger-wrapper"/,
+          /data-slot="tabs-trigger"/,
+        ],
+        'expected Tabs to keep exposing data-component="tabs", data-slot="tabs-list", data-slot="tabs-trigger-wrapper", and data-slot="tabs-trigger" (used by prepare-static-web.ts mobile header CSS)',
       ),
     ],
   },
