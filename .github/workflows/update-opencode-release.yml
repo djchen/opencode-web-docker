@@ -59,22 +59,31 @@ jobs:
 
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Validate automation tokens
+      - name: Validate automation secrets
         if: steps.diff.outputs.changed == 'true'
         env:
-          AUTOMATION_TOKEN: ${{ secrets.OPENCODE_AUTOMATION_TOKEN }}
+          _APP_ID: ${{ secrets.APP_ID }}
+          _APP_KEY: ${{ secrets.APP_PRIVATE_KEY }}
         run: |
-          if [ -z "$AUTOMATION_TOKEN" ]; then
-            printf '%s\n' "OPENCODE_AUTOMATION_TOKEN is required to dispatch CI and approve automated update PRs."
+          if [ -z "$_APP_ID" ] || [ -z "$_APP_KEY" ]; then
+            printf '%s\n' "APP_ID and APP_PRIVATE_KEY secrets are required to create and approve automated update PRs."
             exit 1
           fi
+
+      - name: Generate App token
+        id: app-token
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Create pull request
         id: create-pr
         if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           branch: automation/update-opencode-${{ steps.release.outputs.tag }}
           delete-branch: true
           commit-message: "chore: update opencode to ${{ steps.release.outputs.tag }}"
@@ -85,18 +94,10 @@ jobs:
             - keep OpenCode Web Docker aligned with the latest upstream OpenCode release
             - merge automatically after the required CI checks pass and the automation approval is accepted
 
-      # GITHUB_TOKEN PRs do not trigger pull_request CI, so dispatch it
-      # explicitly with OPENCODE_AUTOMATION_TOKEN.
-      - name: Dispatch CI for pull request branch
-        if: steps.create-pr.outputs.pull-request-number != ''
-        env:
-          GH_TOKEN: ${{ secrets.OPENCODE_AUTOMATION_TOKEN }}
-        run: gh workflow run ci.yml --ref "${{ steps.create-pr.outputs.pull-request-branch }}"
-
       - name: Approve pull request
         if: steps.create-pr.outputs.pull-request-number != ''
         env:
-          GH_TOKEN: ${{ secrets.OPENCODE_AUTOMATION_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: gh pr review --approve "${{ steps.create-pr.outputs.pull-request-url }}"
 
       # Auto-merge waits for branch protection, including required CI checks and
