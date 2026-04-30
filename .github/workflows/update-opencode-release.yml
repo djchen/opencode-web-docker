@@ -62,11 +62,11 @@ jobs:
       - name: Validate automation secrets
         if: steps.diff.outputs.changed == 'true'
         env:
-          _APP_ID: ${{ secrets.APP_ID }}
+          _APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
           _APP_KEY: ${{ secrets.APP_PRIVATE_KEY }}
         run: |
-          if [ -z "$_APP_ID" ] || [ -z "$_APP_KEY" ]; then
-            printf '%s\n' "APP_ID and APP_PRIVATE_KEY secrets are required to create and approve automated update PRs."
+          if [ -z "$_APP_CLIENT_ID" ] || [ -z "$_APP_KEY" ]; then
+            printf '%s\n' "APP_CLIENT_ID and APP_PRIVATE_KEY secrets are required to create and approve automated update PRs."
             exit 1
           fi
 
@@ -75,7 +75,7 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         with:
-          app-id: ${{ secrets.APP_ID }}
+          client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Create pull request
@@ -94,14 +94,8 @@ jobs:
             - keep OpenCode Web Docker aligned with the latest upstream OpenCode release
             - merge automatically after the required CI checks pass and the automation approval is accepted
 
-      - name: Approve pull request
-        if: steps.create-pr.outputs.pull-request-number != ''
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh pr review --approve "${{ steps.create-pr.outputs.pull-request-url }}"
-
-      # Auto-merge waits for branch protection, including required CI checks and
-      # the approval above. If checks fail, the PR remains open for inspection.
+      # Auto-merge waits for branch protection, including required CI checks.
+      # If checks fail, the PR remains open for inspection.
       - name: Enable auto-merge
         if: steps.create-pr.outputs.pull-request-number != ''
         env:
