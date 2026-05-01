@@ -35,4 +35,3 @@
 - Root `lint` and `format` scripts only cover `build/`, `runtime/`, and `tests/`; edits in `scripts/`, `config/`, or `.github/workflows/` are not covered by those commands.
 - `package.json` and `Dockerfile` both pin Bun `1.3.13`; keep them in sync.
 - Upstream OpenCode’s default branch is `dev`, not `main`.
-- `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written to browser localStorage. Do not use them for public deployments.

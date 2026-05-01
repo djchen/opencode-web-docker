@@ -47,8 +47,6 @@ All configuration is provided through environment variables at container start.
 | `OPENCODE_SERVER_1_URL` | **yes** | none | First configured backend URL |
 | `OPENCODE_SERVER_<N>_URL` | yes, for every configured index | none | Backend URL for server `N` |
 | `OPENCODE_SERVER_<N>_NAME` | no | none | Name shown for server `N` in the server picker and current server button |
-| `OPENCODE_SERVER_<N>_USERNAME` | no | none | HTTP basic auth username for server `N`. Stored in browser localStorage |
-| `OPENCODE_SERVER_<N>_PASSWORD` | no | none | HTTP basic auth password for server `N`. Stored in browser localStorage |
 | `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | `true` or unset forces server `1`; `false` preserves a valid browser default; integer `N` forces server `N` |
 | `OPENCODE_APP_TITLE` | no | none | Overrides the HTML page title |
 
@@ -73,8 +71,6 @@ OPENCODE_FORCE_DEFAULT_SERVER: 1
 OPENCODE_APP_TITLE: Hosted OpenCode
 ```
 
-**Important**: `OPENCODE_SERVER_<N>_USERNAME` and `OPENCODE_SERVER_<N>_PASSWORD` are written into browser localStorage at runtime. Do not set these for public deployments.
-
 ## How It Works
 
 1. **Build:** the Docker build compiles the upstream app, injects the runtime bootstrap into `index.html`, patches the built frontend to use the selected backend, and runs a compatibility check so upstream persistence changes fail early.
@@ -86,7 +82,7 @@ Default server behavior:
 - If `OPENCODE_FORCE_DEFAULT_SERVER` is unset or `true`, server `1` is selected on load.
 - If `OPENCODE_FORCE_DEFAULT_SERVER` is an integer `N`, server `N` is selected on load.
 - If `OPENCODE_FORCE_DEFAULT_SERVER=false`, the browser's existing default is preserved when it still points to a server in the merged list. Otherwise the wrapper falls back to server `1`.
-- For configured servers already stored in the browser, non-empty env-provided `NAME`, `USERNAME`, and `PASSWORD` values replace stored values. Unset and empty values leave stored optional metadata unchanged.
+- If a configured server already exists in browser storage, a non-empty `OPENCODE_SERVER_<N>_NAME` updates its display name. Unset or empty names keep the stored display name.
 
 ## Verification
 

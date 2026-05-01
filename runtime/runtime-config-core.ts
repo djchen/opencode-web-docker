@@ -101,23 +101,23 @@ function buildConfiguredServers(existingByUrl: Record<string, ServerListItem>) {
     configuredUrls[serverUrl] = true
 
     const existing = existingByUrl[serverUrl]
-    const next: ServerListItem & { http: Record<string, string> } = { type: "http", http: { url: serverUrl } }
+    const nextHttp: NonNullable<ServerListItem["http"]> = { url: serverUrl }
+    const next: ServerListItem = {
+      type: "http",
+      http: nextHttp,
+    }
 
     if (existing && typeof existing === "object") {
       if (typeof existing.displayName === "string") next.displayName = existing.displayName
       if (existing.http && typeof existing.http === "object") {
-        if (typeof existing.http.username === "string") next.http.username = existing.http.username
-        if (typeof existing.http.password === "string") next.http.password = existing.http.password
+        if (typeof existing.http.username === "string") nextHttp.username = existing.http.username
+        if (typeof existing.http.password === "string") nextHttp.password = existing.http.password
       }
     }
 
     const serverName = _b64d(server.name).trim()
-    const serverUsername = _b64d(server.username).trim()
-    const serverPassword = _b64d(server.password)
 
     if (serverName) next.displayName = serverName
-    if (serverUsername) next.http.username = serverUsername
-    if (serverPassword) next.http.password = serverPassword
 
     mergedConfigured.push(next)
   }

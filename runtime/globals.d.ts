@@ -1,4 +1,4 @@
-declare const configuredServers: Array<{ url: string; name: string; username: string; password: string }>
+declare const configuredServers: Array<{ url: string; name: string }>
 declare const forceDefaultMode: "force" | "preserve"
 declare const configuredDefaultIndex: number
 declare const appTitle: string
