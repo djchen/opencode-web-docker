@@ -1,6 +1,7 @@
 [general]
 root = "/opt/opencode-web/public"
 page-fallback = "/opt/opencode-web/public/index.html"
+health = true
 
 [[advanced.headers]]
 source = "/**"

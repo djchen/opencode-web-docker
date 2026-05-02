@@ -56,7 +56,7 @@ COPY --chown=sws:sws --from=build /opt/opencode-web/release/ ./
 EXPOSE 80
 
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1/index.html || exit 1
+  CMD wget -q --spider http://127.0.0.1/health || exit 1
 
 ENTRYPOINT ["/bin/sh", "/opt/opencode-web/runtime/entrypoint.sh"]
 CMD ["static-web-server", "-w", "/opt/opencode-web/config/sws.toml"]

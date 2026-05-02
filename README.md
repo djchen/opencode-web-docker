@@ -1,16 +1,16 @@
 # OpenCode Web Docker
 
-Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with runtime configuration injection for one or more `opencode serve` backends.
+Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with host-based runtime configuration injection for one or more `opencode serve` backends.
 
-The container seeds configured servers into browser localStorage, overrides the HTML page title, and applies CSS customizations.
+The container serves the same built app on multiple hostnames, injects the matching backend and title for each hostname, and applies CSS customizations.
 
 ## Quick Start
 ### OpenCode Server
 Run `opencode serve` to expose an endpoint that OpenCode clients can use.
 
-Example: `opencode serve --port 4096 --cors https://opencode.example.com`
+Example: `opencode serve --port 4096 --cors https://web1.opencode.example.com`
 
-Set `--cors` to the web app origin that users open in the browser, such as `https://opencode.example.com`. Do not set it to the backend API URL.
+Set `--cors` to the web app origin that users open in the browser, such as `https://web1.opencode.example.com`. Do not set it to the backend API URL.
 
 Consider putting the `opencode serve` backend behind TLS with a reverse proxy, or exposing it through Tailscale, ZeroTier, etc.
 
@@ -30,11 +30,14 @@ docker compose up -d
 docker run -d \
   --name opencode-web \
   -p 8080:80 \
-  -e OPENCODE_SERVER_1_URL=https://opencode-api1.example.com \
-  -e OPENCODE_SERVER_1_NAME='Server 1' \
-  -e OPENCODE_SERVER_2_URL=https://opencode-api2.example.com \
-  -e OPENCODE_SERVER_2_NAME='Server 2' \
-  -e OPENCODE_FORCE_DEFAULT_SERVER=1 \
+  -e SERVER_1_HOST=web1.opencode.example.com \
+  -e SERVER_1_BACKEND=https://api1.opencode.example.com \
+  -e SERVER_1_NAME='Server 1' \
+  -e SERVER_1_APP_TITLE='OpenCode Server 1' \
+  -e SERVER_2_HOST=web2.opencode.example.com \
+  -e SERVER_2_BACKEND=https://api2.opencode.example.com \
+  -e SERVER_2_NAME='Server 2' \
+  -e SERVER_2_APP_TITLE='OpenCode Server 2' \
   ghcr.io/djchen/opencode-web-docker:latest
 ```
 
@@ -44,45 +47,48 @@ All configuration is provided through environment variables at container start.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENCODE_SERVER_1_URL` | **yes** | none | First configured backend URL |
-| `OPENCODE_SERVER_<N>_URL` | yes, for every configured index | none | Backend URL for server `N` |
-| `OPENCODE_SERVER_<N>_NAME` | no | none | Name shown for server `N` in the server picker and current server button |
-| `OPENCODE_FORCE_DEFAULT_SERVER` | no | `true` | `true` or unset forces server `1`; `false` preserves a valid browser default; integer `N` forces server `N` |
-| `OPENCODE_APP_TITLE` | no | none | Overrides the HTML page title |
+| `SERVER_1_HOST` | **yes** | none | First web hostname served by this container |
+| `SERVER_1_BACKEND` | **yes** | none | Backend URL injected for the first hostname |
+| `SERVER_<N>_HOST` | yes, for every configured index | none | Web hostname for server `N` |
+| `SERVER_<N>_BACKEND` | yes, for every configured index | none | Backend URL injected for server `N` |
+| `SERVER_<N>_NAME` | no | none | Display name stored for server `N` |
+| `SERVER_<N>_APP_TITLE` | no | none | HTML page title for server `N` |
 
 Rules:
 
 - Configured indexes must be contiguous unpadded integers starting at `1`. Valid examples: `1`; `1,2`; `1,2,3`. Invalid examples: `01`; `1,3`.
-- URLs are normalized by trimming whitespace, adding `http://` when missing, and removing trailing slashes.
-- `OPENCODE_FORCE_DEFAULT_SERVER` accepts only the exact values `true`, `false`, or an integer index `N`.
-- Startup fails fast on missing indexed URLs, non-contiguous indexes, duplicate normalized URLs, or an invalid `OPENCODE_FORCE_DEFAULT_SERVER` value.
-- `OPENCODE_APP_TITLE`, when set, updates the HTML page title only. It does not change visible in-app branding.
+- Hosts are hostname-only ASCII DNS names. They are trimmed and lowercased. Do not include protocol, port, path, whitespace, wildcards, or direct Unicode. Supply IDNs as Punycode, for example `xn--...`.
+- Backend URLs must be absolute `http://` or `https://` URLs. They are normalized by trimming whitespace, lowercasing scheme and host, and removing trailing slashes.
+- Startup fails fast on missing indexed hosts or backends, non-contiguous indexes, invalid hosts, or duplicate normalized hosts. Duplicate backend URLs are allowed.
+- `SERVER_<N>_APP_TITLE`, when set, updates the HTML page title for that server's hostname only. It does not change visible in-app branding.
 
 Example:
 
 ```yaml
-OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
-OPENCODE_SERVER_1_NAME: Server 1
+SERVER_1_HOST: web1.opencode.example.com
+SERVER_1_BACKEND: https://api1.opencode.example.com
+SERVER_1_NAME: Server 1
+SERVER_1_APP_TITLE: OpenCode Server 1
 
-OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
-OPENCODE_SERVER_2_NAME: Server 2
-
-OPENCODE_FORCE_DEFAULT_SERVER: 1
-OPENCODE_APP_TITLE: Hosted OpenCode
+SERVER_2_HOST: web2.opencode.example.com
+SERVER_2_BACKEND: https://api2.opencode.example.com
+SERVER_2_NAME: Server 2
+SERVER_2_APP_TITLE: OpenCode Server 2
 ```
+
+## Host-Based Routing
+
+Each configured web hostname gets its own SWS virtual host and its own `/runtime-config.js`. That runtime config injects exactly one backend and forces that backend as the browser default for that origin.
+
+Route every web hostname to the same container or reverse proxy target. If TLS terminates in front of this container, the certificate must cover every web hostname as Subject Alternative Names (SANs). Each `opencode serve` backend must allow CORS from the matching web origin, for example `opencode serve --cors https://web1.opencode.example.com`.
+
+Requests with an unmatched `Host` header never receive a generated runtime config or configured backend. They may receive the shared app shell for unknown SPA paths, but `/runtime-config.js` remains inert because no host-specific config exists for that host.
 
 ## How It Works
 
-1. **Build:** the Docker build compiles the upstream app, injects the runtime bootstrap into `index.html`, patches the built frontend to use the selected backend, and runs a compatibility check so upstream persistence changes fail early.
-2. **Runtime:** `runtime/entrypoint.sh` generates `/runtime-config.js`, seeds configured servers into browser localStorage, applies default-server selection, and sets `OPENCODE_APP_TITLE` when provided.
-3. **Serving:** [static-web-server](https://github.com/static-web-server/static-web-server) serves the static assets. `config/sws.toml` disables caching for `/runtime-config.js` and `/index.html`.
-
-Default server behavior:
-
-- If `OPENCODE_FORCE_DEFAULT_SERVER` is unset or `true`, server `1` is selected on load.
-- If `OPENCODE_FORCE_DEFAULT_SERVER` is an integer `N`, server `N` is selected on load.
-- If `OPENCODE_FORCE_DEFAULT_SERVER=false`, the browser's existing default is preserved when it still points to a server in the merged list. Otherwise the wrapper falls back to server `1`.
-- If a configured server already exists in browser storage, a non-empty `OPENCODE_SERVER_<N>_NAME` updates its display name. Unset or empty names keep the stored display name.
+1. **Build:** the Docker build compiles the upstream app, injects the runtime bootstrap into `index.html`, patches the built frontend to use `window.__OPENCODE_SERVER_URL`, and runs a compatibility check so upstream persistence changes fail early.
+2. **Runtime:** `runtime/entrypoint.sh` validates `SERVER_<N>_HOST` and `SERVER_<N>_BACKEND`, generates per-host roots under `/opt/opencode-web/vhosts/<host>/`, prepares an unmatched-host root without runtime config, and writes `/opt/opencode-web/config/sws.toml`.
+3. **Serving:** [static-web-server](https://github.com/static-web-server/static-web-server) serves virtual-host roots for configured hosts and an inert root for unmatched hosts. `config/sws.toml` remains the base cache and CSP contract.
 
 ## Verification
 

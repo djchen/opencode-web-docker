@@ -4,8 +4,11 @@ services:
     ports:
       - 8080:80
     environment:
-      OPENCODE_SERVER_1_URL: https://opencode-api1.example.com
-      OPENCODE_SERVER_1_NAME: Server 1
-      OPENCODE_SERVER_2_URL: https://opencode-api2.example.com
-      OPENCODE_SERVER_2_NAME: Server 2
-      OPENCODE_FORCE_DEFAULT_SERVER: 1
+      SERVER_1_HOST: web1.opencode.example.com
+      SERVER_1_BACKEND: https://api1.opencode.example.com
+      SERVER_1_NAME: Server 1
+      SERVER_1_APP_TITLE: OpenCode Server 1
+      SERVER_2_HOST: web2.opencode.example.com
+      SERVER_2_BACKEND: https://api2.opencode.example.com
+      SERVER_2_NAME: Server 2
+      SERVER_2_APP_TITLE: OpenCode Server 2
