@@ -18,6 +18,10 @@ trim() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
 }
 
+ascii_lower() {
+  printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]'
+}
+
 normalize_url() {
   trimmed="$(trim "$1")"
   if [ -z "$trimmed" ]; then
@@ -25,10 +29,10 @@ normalize_url() {
     return
   fi
 
-  lower="$(printf '%s' "$trimmed" | tr 'A-Z' 'a-z')"
+  lower="$(ascii_lower "$trimmed")"
   case "$lower" in
     http://*|https://*)
-      scheme="$(printf '%s' "$trimmed" | sed 's|://.*||' | tr 'A-Z' 'a-z')"
+      scheme="$(ascii_lower "$(printf '%s' "$trimmed" | sed 's|://.*||')")"
       rest="$(printf '%s' "$trimmed" | sed 's|^[^:]*://||')"
       ;;
     *)
@@ -38,7 +42,7 @@ normalize_url() {
   esac
 
   authority="$(printf '%s' "$rest" | sed 's|/.*$||')"
-  host="$(printf '%s' "$authority" | sed 's|:.*$||' | tr 'A-Z' 'a-z')"
+  host="$(ascii_lower "$(printf '%s' "$authority" | sed 's|:.*$||')")"
   if [ -z "$host" ]; then
     printf '%s' ""
     return
@@ -66,7 +70,7 @@ normalize_host() {
     return
   fi
 
-  lower="$(printf '%s' "$trimmed" | tr 'A-Z' 'a-z')"
+  lower="$(ascii_lower "$trimmed")"
   case "$lower" in
     *://*|*/*|*:*|*[[:space:]]*|*\**|.*|*.|*..*)
       printf '%s' ""
@@ -119,6 +123,7 @@ fi
 
 raw_indexes=""
 # Read null-delimited env entries so multiline values cannot inject bogus names.
+# shellcheck disable=SC2016
 env_names="$(env -0 | xargs -0 -n1 sh -c 'entry=$1; printf "%s\n" "${entry%%=*}"' sh)"
 for env_name in $env_names; do
   case "$env_name" in
