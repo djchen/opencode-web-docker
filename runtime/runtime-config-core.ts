@@ -7,7 +7,7 @@ function warnIncompatibleStore(deps: RuntimeConfigDeps, reason: string) {
   deps.console.warn(
     "OpenCode runtime-config may be incompatible with this upstream build:",
     reason,
-    "Review runtime/entrypoint.sh and runtime/runtime-config-core.ts against upstream app persistence.",
+    "Review runtime/generate-nginx-config.sh and runtime/runtime-config-core.ts against upstream app persistence.",
   )
 }
 

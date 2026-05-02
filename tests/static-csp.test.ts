@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildExpectedStaticWebCsp, parseStaticWebHeaderRules } from "./static-csp.contracts"
+import { buildExpectedStaticWebCsp, parseNginxAddHeaders } from "./static-csp.contracts"
 
 describe("static CSP compatibility", () => {
   test("adds only deployment-specific directives to upstream CSP", () => {
@@ -26,35 +26,30 @@ describe("static CSP compatibility", () => {
     expect(expected.get("connect-src")).toEqual(["'self'", "data:", "http:", "https:", "ws:", "wss:"])
   })
 
-  test("parses static-web header rules by source", () => {
-    const rules = parseStaticWebHeaderRules(`
-[[advanced.headers]]
-source = "/**"
+  test("parses nginx add_header directives", () => {
+    const headers = parseNginxAddHeaders(`
+location / {
+  add_header Cache-Control "no-store" always;
+  add_header Content-Security-Policy "default-src 'self'" always;
+}
 
-[advanced.headers.headers]
-Cache-Control = "no-store"
-Content-Security-Policy = "default-src 'self'"
-
-[[advanced.headers]]
-source = "/assets/**"
-
-[advanced.headers.headers]
-Cache-Control = "public, max-age=31536000, immutable"
+location ^~ /assets/ {
+  add_header Cache-Control "public, max-age=31536000, immutable" always;
+}
 `)
 
-    expect(rules).toEqual([
+    expect(headers).toEqual([
       {
-        source: "/**",
-        headers: {
-          "Cache-Control": "no-store",
-          "Content-Security-Policy": "default-src 'self'",
-        },
+        name: "Cache-Control",
+        value: "no-store",
       },
       {
-        source: "/assets/**",
-        headers: {
-          "Cache-Control": "public, max-age=31536000, immutable",
-        },
+        name: "Content-Security-Policy",
+        value: "default-src 'self'",
+      },
+      {
+        name: "Cache-Control",
+        value: "public, max-age=31536000, immutable",
       },
     ])
   })

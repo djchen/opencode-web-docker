@@ -1,0 +1,18 @@
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+  add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' data: http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
+
+  location = /health {
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  location / {
+    return 404;
+  }
+}
+
+# OPENCODE_WEB_GENERATED_SERVERS

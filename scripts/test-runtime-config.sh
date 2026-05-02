@@ -73,12 +73,37 @@ expect_final_image_layout() {
 
   printf '==> %s\n' "$name"
   "$@" sh -lc '
-    test -f /opt/opencode-web/config/sws.toml &&
+    test -f /opt/opencode-web/config/nginx.conf.template &&
     test ! -e /opt/opencode-web/config/config &&
     test -f /opt/opencode-web/public/index.html &&
-    test -f /opt/opencode-web/runtime/entrypoint.sh &&
+    test -f /opt/opencode-web/runtime/generate-nginx-config.sh &&
+    test -x /docker-entrypoint.d/40-opencode-web.sh &&
     test -f /opt/opencode-web/runtime/runtime-bundle.js
   '
+}
+
+with_nginx_container() {
+  name="$1"
+  shift
+
+  printf '==> %s\n' "$name"
+  container_id="$(docker run -d "$@")"
+  trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT HUP INT TERM
+  for _ in 1 2 3 4 5 6 7 8 9; do
+    if docker exec "$container_id" wget -q --spider http://127.0.0.1/health >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  docker logs "$container_id" >&2 || true
+  printf 'nginx did not become healthy for: %s\n' "$name" >&2
+  exit 1
+}
+
+stop_nginx_container() {
+  docker rm -f "$container_id" >/dev/null 2>&1 || true
+  trap - EXIT HUP INT TERM
 }
 
 expect_generated_runtime_config_parses() {
@@ -160,7 +185,7 @@ expect_failure \
   docker run --rm \
     -e SERVER_1_URL=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject malformed indexed env names" \
@@ -168,7 +193,7 @@ expect_failure \
   docker run --rm \
     -e SERVER_1FOO_HOST=x \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject padded backend indexes" \
@@ -176,7 +201,7 @@ expect_failure \
   docker run --rm \
     -e SERVER_01_HOST=web1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject non-contiguous backend indexes" \
@@ -187,7 +212,7 @@ expect_failure \
     -e SERVER_3_HOST=web3.opencode.example.com \
     -e SERVER_3_BACKEND=http://api3.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject missing host" \
@@ -195,7 +220,7 @@ expect_failure \
   docker run --rm \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject missing backend" \
@@ -203,7 +228,7 @@ expect_failure \
   docker run --rm \
     -e SERVER_1_HOST=web1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject protocol in host" \
@@ -212,7 +237,7 @@ expect_failure \
     -e SERVER_1_HOST=https://web1.opencode.example.com \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject port in host" \
@@ -221,7 +246,7 @@ expect_failure \
     -e SERVER_1_HOST=web1.opencode.example.com:8080 \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject path in host" \
@@ -230,7 +255,7 @@ expect_failure \
     -e SERVER_1_HOST=web1.opencode.example.com/app \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject direct unicode IDN host" \
@@ -239,7 +264,7 @@ expect_failure \
     -e SERVER_1_HOST=täst.example.com \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject duplicate hosts" \
@@ -250,7 +275,7 @@ expect_failure \
     -e SERVER_2_HOST=web1.opencode.example.com \
     -e SERVER_2_BACKEND=http://api2.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject case-variant duplicate hosts" \
@@ -261,7 +286,7 @@ expect_failure \
     -e SERVER_2_HOST=web1.opencode.example.com \
     -e SERVER_2_BACKEND=http://api2.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject backend without scheme" \
@@ -270,7 +295,7 @@ expect_failure \
     -e SERVER_1_HOST=web1.opencode.example.com \
     -e SERVER_1_BACKEND=api1.opencode.example.com \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 expect_failure \
   "reject backend with empty host after scheme" \
@@ -279,7 +304,7 @@ expect_failure \
     -e SERVER_1_HOST=web1.opencode.example.com \
     -e SERVER_1_BACKEND='http://' \
     "$image_tag" \
-    true
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh'
 
 multiline_env_value="$(printf 'before\nSERVER_9_HOST\nafter')"
 
@@ -297,7 +322,7 @@ expect_success \
     -e SERVER_1_BACKEND=http://api1.opencode.example.com \
     -e "UNRELATED_MULTILINE=$multiline_env_value" \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test ! -e /opt/opencode-web/public/runtime-config.js'
 
 expect_success \
   "generate valid host-based runtime payloads" \
@@ -310,7 +335,7 @@ expect_success \
     -e SERVER_2_BACKEND=https://api2.opencode.example.com/ \
     -e SERVER_2_APP_TITLE=Server\ 2\ Web \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && test -s /opt/opencode-web/vhosts/web2.opencode.example.com/runtime-config.js && test -s /opt/opencode-web/config/sws.toml && test -d /opt/opencode-web/vhosts/web2.opencode.example.com/assets && test -s /opt/opencode-web/public/opencode-web-customizations.css && ! grep -F "<style id=\"opencode-web-customizations\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /opt/opencode-web/public/index.html >/dev/null'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test -s /opt/opencode-web/runtime-configs/web2.opencode.example.com.js && test -s /etc/nginx/conf.d/default.conf && test ! -e /opt/opencode-web/public/runtime-config.js && test -d /opt/opencode-web/public/assets && test -s /opt/opencode-web/public/opencode-web-customizations.css && ! grep -F "<style id=\"opencode-web-customizations\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\"stylesheet\" href=\"/opencode-web-customizations.css\">" /opt/opencode-web/public/index.html >/dev/null'
 
 expect_success \
   "runtime config generation is idempotent" \
@@ -320,7 +345,7 @@ expect_success \
     -e SERVER_2_HOST=web2.opencode.example.com \
     -e SERVER_2_BACKEND=http://api2.opencode.example.com \
     "$image_tag" \
-    sh -lc '/opt/opencode-web/runtime/entrypoint.sh true && test "$(grep -c "\[\[advanced.virtual-hosts\]\]" /opt/opencode-web/config/sws.toml)" -eq 2'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test "$(grep -c "server_name web" /etc/nginx/conf.d/default.conf)" -eq 2'
 
 expect_generated_runtime_config_applies \
   "server 1 runtime-config applies only server 1" \
@@ -336,7 +361,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_2_HOST=web2.opencode.example.com \
     -e SERVER_2_BACKEND=https://api2.opencode.example.com/ \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web1.opencode.example.com.js'
 
 expect_generated_runtime_config_applies \
   "server 2 runtime-config applies only server 2" \
@@ -354,7 +379,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_1_APP_TITLE=Server\ 1\ Web \
     -e SERVER_2_APP_TITLE=Server\ 2\ Web \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/vhosts/web2.opencode.example.com/runtime-config.js && cat /opt/opencode-web/vhosts/web2.opencode.example.com/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web2.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web2.opencode.example.com.js'
 
 expect_generated_runtime_config_applies \
   "generated runtime-config preserves unicode metadata" \
@@ -368,7 +393,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_1_NAME=München \
     -e SERVER_1_APP_TITLE=你好\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/xn--tst-qla.example.com.js && cat /opt/opencode-web/runtime-configs/xn--tst-qla.example.com.js'
 
 expect_generated_runtime_config_parses \
   "generated runtime-config.js parses as JavaScript" \
@@ -378,7 +403,7 @@ expect_generated_runtime_config_parses \
     -e SERVER_1_NAME=Server\ 1 \
     -e SERVER_1_APP_TITLE=Hosted\ OpenCode \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web1.opencode.example.com.js'
 
 expect_generated_runtime_config_applies \
   "normalizes uppercase scheme and hostname to lowercase" \
@@ -390,7 +415,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_1_HOST=WEB1.OPENCODE.EXAMPLE.COM \
     -e SERVER_1_BACKEND=HTTPS://API1.OPENCODE.EXAMPLE.COM \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web1.opencode.example.com.js'
 
 expect_generated_runtime_config_applies \
   "preserves URL path case while normalizing scheme and host" \
@@ -402,7 +427,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_1_HOST=web1.opencode.example.com \
     -e SERVER_1_BACKEND=HTTPS://API.OPENCODE.EXAMPLE.COM/pAtH \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web1.opencode.example.com.js'
 
 expect_generated_runtime_config_applies \
   "preserves port while normalizing scheme and host" \
@@ -414,7 +439,7 @@ expect_generated_runtime_config_applies \
     -e SERVER_1_HOST=web1.opencode.example.com \
     -e SERVER_1_BACKEND=HTTP://API.OPENCODE.EXAMPLE.COM:8080 \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && cat /opt/opencode-web/public/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && cat /opt/opencode-web/runtime-configs/web1.opencode.example.com.js'
 
 expect_success \
   "allow duplicate backend URLs across hosts" \
@@ -424,103 +449,71 @@ expect_success \
     -e SERVER_2_HOST=web2.opencode.example.com \
     -e SERVER_2_BACKEND=http://api.opencode.example.com/ \
     "$image_tag" \
-    sh -lc 'test -s /opt/opencode-web/public/runtime-config.js && test -s /opt/opencode-web/vhosts/web2.opencode.example.com/runtime-config.js'
+    sh -lc '/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test -s /opt/opencode-web/runtime-configs/web2.opencode.example.com.js'
+
+with_nginx_container \
+  "nginx starts through official entrypoint" \
+  -e SERVER_1_HOST=web1.opencode.example.com \
+  -e SERVER_1_BACKEND=http://api1.opencode.example.com \
+  -e SERVER_2_HOST=web2.opencode.example.com \
+  -e SERVER_2_BACKEND=http://api2.opencode.example.com \
+  "$image_tag"
 
 expect_generated_runtime_config_applies \
-  "SWS serves host 1 runtime config" \
+  "nginx serves host 1 runtime config" \
   "OpenCode" \
   "http://api1.opencode.example.com" \
   "http://api1.opencode.example.com" \
   '[{"url":"http://api1.opencode.example.com","name":""}]' \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; wget -q --header="Host: web1.opencode.example.com" -O - http://127.0.0.1/runtime-config.js'
+  docker exec "$container_id" wget -q --header="Host: web1.opencode.example.com" -O - http://127.0.0.1/runtime-config.js
 
 expect_generated_runtime_config_applies \
-  "SWS serves host 2 runtime config" \
+  "nginx serves host 2 runtime config" \
   "OpenCode" \
   "http://api2.opencode.example.com" \
   "http://api2.opencode.example.com" \
   '[{"url":"http://api2.opencode.example.com","name":""}]' \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1/runtime-config.js'
+  docker exec "$container_id" wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1/runtime-config.js
 
 expect_generated_runtime_config_applies \
-  "SWS matches vhost when Host includes port" \
+  "nginx matches server when Host includes port" \
   "OpenCode" \
   "http://api2.opencode.example.com" \
   "http://api2.opencode.example.com" \
   '[{"url":"http://api2.opencode.example.com","name":""}]' \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; wget -q --header="Host: web2.opencode.example.com:80" -O - http://127.0.0.1/runtime-config.js'
+  docker exec "$container_id" wget -q --header="Host: web2.opencode.example.com:80" -O - http://127.0.0.1/runtime-config.js
 
 expect_success \
-  "SWS unmatched host receives inert app shell" \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; body="$(wget -q --header="Host: unmatched.example.com" -O - http://127.0.0.1/runtime-config.js)"; printf "%s\n" "$body" | grep -q "/runtime-config.js" && ! printf "%s\n" "$body" | grep -q "configuredServers"'
+  "nginx unmatched host returns 404 except health" \
+  docker exec "$container_id" sh -lc '
+    wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/health &&
+    ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/runtime-config.js &&
+    ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/future/opencode/route
+  '
 
 expect_success \
-  "SWS unmatched deep route gets inert app shell" \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; body="$(wget -q --header="Host: unmatched.example.com" -O - http://127.0.0.1/future/opencode/route)"; printf "%s\n" "$body" | grep -q "/runtime-config.js" && ! printf "%s\n" "$body" | grep -q "configuredServers"'
+  "nginx configured host SPA route returns app shell" \
+  docker exec "$container_id" sh -lc 'wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1/future/opencode/route | grep -q "/runtime-config.js"'
 
 expect_success \
-  "SWS unknown vhost SPA route returns app shell" \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    -e SERVER_2_HOST=web2.opencode.example.com \
-    -e SERVER_2_BACKEND=http://api2.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml & for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done; wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1/future/opencode/route | grep -q "/runtime-config.js"'
+  "nginx missing static file returns 404" \
+  docker exec "$container_id" sh -lc '! wget -q --spider --header="Host: web2.opencode.example.com" http://127.0.0.1/missing.js'
 
 expect_success \
-  "configured host app shell has no-cache and CSP headers" \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml &
-      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done
-      wget -q --spider http://127.0.0.1/health
-      headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null http://127.0.0.1/ 2>&1)"
-      printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
+  "configured host app shell has no-store and CSP headers" \
+  docker exec "$container_id" sh -lc '
+    headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null http://127.0.0.1/ 2>&1)"
+    printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"
+  '
 
 expect_success \
   "hashed assets have long-lived cache headers" \
-  docker run --rm \
-    -e SERVER_1_HOST=web1.opencode.example.com \
-    -e SERVER_1_BACKEND=http://api1.opencode.example.com \
-    "$image_tag" \
-    sh -lc 'static-web-server -a 0.0.0.0 -w /opt/opencode-web/config/sws.toml &
-      for i in 1 2 3 4 5 6 7 8 9; do wget -q --spider http://127.0.0.1/health 2>/dev/null && break; sleep 1; done
-      wget -q --spider http://127.0.0.1/health
-      set -- /opt/opencode-web/public/assets/*
-      asset="${1##*/}"
-      headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null "http://127.0.0.1/assets/$asset" 2>&1)"
-      printf "%s\n" "$headers" | grep -qi "cache-control.*immutable" && printf "%s\n" "$headers" | grep -qi "content-security-policy"'
+  docker exec "$container_id" sh -lc '
+    set -- /opt/opencode-web/public/assets/*
+    asset="${1##*/}"
+    headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null "http://127.0.0.1/assets/$asset" 2>&1)"
+    printf "%s\n" "$headers" | grep -qi "cache-control.*immutable" && printf "%s\n" "$headers" | grep -qi "content-security-policy"
+  '
+
+stop_nginx_container
 printf '==> All runtime-config regression checks passed\n'

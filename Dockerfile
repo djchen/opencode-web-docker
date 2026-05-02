@@ -33,10 +33,10 @@ RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
 RUN mkdir -p release/public release/runtime release/config \
  && cp -r config/. release/config/ \
  && cp dist/runtime/runtime-bundle.js release/runtime/ \
- && cp runtime/entrypoint.sh release/runtime/ \
+ && cp runtime/generate-nginx-config.sh release/runtime/ \
  && cp -r opencode/packages/app/dist/. release/public/
 
-FROM ghcr.io/static-web-server/static-web-server:2-alpine
+FROM nginx:alpine-slim
 
 ARG VERSION=dev
 ARG REVISION=unknown
@@ -51,12 +51,14 @@ LABEL org.opencontainers.image.licenses="MIT"
 
 WORKDIR /opt/opencode-web
 
-COPY --chown=sws:sws --from=build /opt/opencode-web/release/ ./
+COPY --from=build /opt/opencode-web/release/ ./
+COPY --from=build /opt/opencode-web/release/runtime/generate-nginx-config.sh /docker-entrypoint.d/40-opencode-web.sh
+
+RUN chmod +x /docker-entrypoint.d/40-opencode-web.sh
 
 EXPOSE 80
 
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider http://127.0.0.1/health || exit 1
 
-ENTRYPOINT ["/bin/sh", "/opt/opencode-web/runtime/entrypoint.sh"]
-CMD ["static-web-server", "-w", "/opt/opencode-web/config/sws.toml"]
+CMD ["nginx", "-g", "daemon off;"]

@@ -78,17 +78,17 @@ SERVER_2_APP_TITLE: OpenCode Server 2
 
 ## Host-Based Routing
 
-Each configured web hostname gets its own SWS virtual host and its own `/runtime-config.js`. That runtime config injects exactly one backend and forces that backend as the browser default for that origin.
+Each configured web hostname gets its own exact nginx `server` block and its own `/runtime-config.js`. That runtime config injects exactly one backend and forces that backend as the browser default for that origin.
 
 Route every web hostname to the same container or reverse proxy target. If TLS terminates in front of this container, the certificate must cover every web hostname as Subject Alternative Names (SANs). Each `opencode serve` backend must allow CORS from the matching web origin, for example `opencode serve --cors https://web1.opencode.example.com`.
 
-Requests with an unmatched `Host` header never receive a generated runtime config or configured backend. They may receive the shared app shell for unknown SPA paths, but `/runtime-config.js` remains inert because no host-specific config exists for that host.
+Requests with an unmatched `Host` header never receive a generated runtime config or configured backend. Unmatched hosts return `404` for everything except `/health`, which returns `200`.
 
 ## How It Works
 
 1. **Build:** the Docker build compiles the upstream app, injects the runtime bootstrap into `index.html`, patches the built frontend to use `window.__OPENCODE_SERVER_URL`, and runs a compatibility check so upstream persistence changes fail early.
-2. **Runtime:** `runtime/entrypoint.sh` validates `SERVER_<N>_HOST` and `SERVER_<N>_BACKEND`, generates per-host roots under `/opt/opencode-web/vhosts/<host>/`, prepares an unmatched-host root without runtime config, and writes `/opt/opencode-web/config/sws.toml`.
-3. **Serving:** [static-web-server](https://github.com/static-web-server/static-web-server) serves virtual-host roots for configured hosts and an inert root for unmatched hosts. `config/sws.toml` remains the base cache and CSP contract.
+2. **Runtime:** nginx's official entrypoint runs `/docker-entrypoint.d/40-opencode-web.sh`, which validates `SERVER_<N>_HOST` and `SERVER_<N>_BACKEND`, generates per-host runtime configs under `/opt/opencode-web/runtime-configs/<host>.js`, and writes `/etc/nginx/conf.d/default.conf` from `config/nginx.conf.template`.
+3. **Serving:** nginx serves shared static files from `/opt/opencode-web/public`. Configured hosts get exact server blocks, `/runtime-config.js` aliases the matching generated config, extension-like missing static files return `404`, route-like extensionless paths fall back to `/index.html`, and only `/assets/` uses immutable caching.
 
 ## Verification
 
