@@ -32,8 +32,8 @@ normalize_url() {
       rest="$(printf '%s' "$trimmed" | sed 's|^[^:]*://||')"
       ;;
     *)
-      scheme="http"
-      rest="$trimmed"
+      printf '%s' ""
+      return
       ;;
   esac
 
@@ -54,15 +54,67 @@ normalize_url() {
   printf '%s' "$result" | sed 's:/*$::'
 }
 
+normalize_host() {
+  trimmed="$(trim "$1")"
+  if [ -z "$trimmed" ]; then
+    printf '%s' ""
+    return
+  fi
+
+  if printf '%s' "$trimmed" | LC_ALL=C grep '[^ -~]' >/dev/null 2>&1; then
+    printf '%s' ""
+    return
+  fi
+
+  lower="$(printf '%s' "$trimmed" | tr 'A-Z' 'a-z')"
+  case "$lower" in
+    *://*|*/*|*:*|*[[:space:]]*|*\**|.*|*.|*..*)
+      printf '%s' ""
+      return
+      ;;
+  esac
+
+  old_ifs="$IFS"
+  IFS=.
+  for label in $lower; do
+    case "$label" in
+      ""|-*|*-|*[!a-z0-9-]*)
+        IFS="$old_ifs"
+        printf '%s' ""
+        return
+        ;;
+    esac
+  done
+  IFS="$old_ifs"
+
+  printf '%s' "$lower"
+}
+
 encode_base64() {
   printf '%s' "$1" | base64 | tr -d '\n'
 }
 
 runtime_root="/opt/opencode-web"
+public_root="$runtime_root/public"
+config_root="$runtime_root/config"
+vhosts_root="$runtime_root/vhosts"
+unmatched_root="$runtime_root/unmatched-host"
 runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
-runtime_config_path="$runtime_root/public/runtime-config.js"
+runtime_config_path="$public_root/runtime-config.js"
+base_sws_config_path="$config_root/sws.toml"
+base_sws_template_path="$config_root/sws.base.toml"
+generated_sws_config_path="$config_root/sws.generated.toml"
 if [ ! -r "$runtime_bundle_path" ]; then
   die "Missing runtime bundle at $runtime_bundle_path"
+fi
+if [ ! -r "$base_sws_config_path" ]; then
+  die "Missing SWS config at $base_sws_config_path"
+fi
+if [ ! -e "$base_sws_template_path" ]; then
+  cp "$base_sws_config_path" "$base_sws_template_path"
+fi
+if [ ! -r "$base_sws_template_path" ]; then
+  die "Missing base SWS config template at $base_sws_template_path"
 fi
 
 raw_indexes=""
@@ -70,8 +122,8 @@ raw_indexes=""
 env_names="$(env -0 | xargs -0 -n1 sh -c 'entry=$1; printf "%s\n" "${entry%%=*}"' sh)"
 for env_name in $env_names; do
   case "$env_name" in
-    OPENCODE_SERVER_*_URL|OPENCODE_SERVER_*_NAME)
-      suffixless="${env_name#OPENCODE_SERVER_}"
+    SERVER_[0-9]*_HOST|SERVER_[0-9]*_BACKEND|SERVER_[0-9]*_NAME|SERVER_[0-9]*_APP_TITLE)
+      suffixless="${env_name#SERVER_}"
       index="${suffixless%%_*}"
       case "$index" in
         ""|*[!0-9]*|0|0[0-9]*)
@@ -85,94 +137,142 @@ done
 
 raw_indexes="${raw_indexes# }"
 if [ -z "$raw_indexes" ]; then
-  die "OPENCODE_SERVER_1_URL is required."
+  die "SERVER_1_HOST and SERVER_1_BACKEND are required."
 fi
 
 indexes="$(printf '%s' "$raw_indexes" | tr ' ' '\n' | sed '/^$/d' | sort -n -u)"
 expected_index=1
 max_index=0
+normalized_hosts=""
 for index in $indexes; do
   if [ "$index" -ne "$expected_index" ]; then
     die "Configured backend indexes must be contiguous starting at 1. Missing index $expected_index."
   fi
 
-  url_var="OPENCODE_SERVER_${index}_URL"
-  url_value="$(get_env "$url_var")"
-  normalized_url="$(normalize_url "$url_value")"
-  if [ -z "$normalized_url" ]; then
-    die "$url_var is required and must not be empty after normalization."
+  host_var="SERVER_${index}_HOST"
+  backend_var="SERVER_${index}_BACKEND"
+  host_value="$(get_env "$host_var")"
+  backend_value="$(get_env "$backend_var")"
+  normalized_host="$(normalize_host "$host_value")"
+  normalized_backend="$(normalize_url "$backend_value")"
+
+  if [ -z "$normalized_host" ]; then
+    die "$host_var is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs."
+  fi
+  if [ -z "$normalized_backend" ]; then
+    die "$backend_var is required and must be an absolute http(s) URL."
   fi
 
-  if [ -n "${normalized_urls-}" ] && printf '%s\n' "$normalized_urls" | grep -F -x -- "$normalized_url" >/dev/null 2>&1; then
-    die "Duplicate configured backend URL after normalization: $normalized_url"
+  if [ -n "$normalized_hosts" ] && printf '%s\n' "$normalized_hosts" | grep -F -x -- "$normalized_host" >/dev/null 2>&1; then
+    die "Duplicate configured host after normalization: $normalized_host"
   fi
 
-  if [ -n "${normalized_urls-}" ]; then
-    normalized_urls="$(printf '%s\n%s' "$normalized_urls" "$normalized_url")"
+  if [ -n "$normalized_hosts" ]; then
+    normalized_hosts="$(printf '%s\n%s' "$normalized_hosts" "$normalized_host")"
   else
-    normalized_urls="$normalized_url"
+    normalized_hosts="$normalized_host"
   fi
   max_index="$index"
   expected_index=$((expected_index + 1))
 done
 
-if has_env OPENCODE_FORCE_DEFAULT_SERVER; then
-  force_default_raw="$(get_env OPENCODE_FORCE_DEFAULT_SERVER)"
-else
-  force_default_raw="true"
-fi
-force_mode="force"
-default_server_index="1"
-app_title_b64="$(encode_base64 "$(get_env OPENCODE_APP_TITLE)")"
+write_runtime_config() {
+  backend_url="$1"
+  server_name="$2"
+  app_title="$3"
+  output_path="$4"
+  url_b64="$(encode_base64 "$backend_url")"
+  name_b64="$(encode_base64 "$server_name")"
+  app_title_b64="$(encode_base64 "$app_title")"
 
-case "$force_default_raw" in
-  true)
-    ;;
-  "")
-    die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."
-    ;;
-  false)
-    force_mode="preserve"
-    default_server_index="1"
-    ;;
-  *[!0-9]*)
-    die "OPENCODE_FORCE_DEFAULT_SERVER must be true, false, or a configured numeric index."
-    ;;
-  *)
-    if [ "$force_default_raw" -lt 1 ] || [ "$force_default_raw" -gt "$max_index" ]; then
-      die "OPENCODE_FORCE_DEFAULT_SERVER=$force_default_raw is outside the configured backend range 1..$max_index."
-    fi
-    force_mode="force"
-    default_server_index="$force_default_raw"
-    ;;
-esac
-
-server_entries=""
-index=1
-while [ "$index" -le "$max_index" ]; do
-  url_value="$(printf '%s\n' "$normalized_urls" | sed -n "${index}p")"
-  url_b64="$(encode_base64 "$url_value")"
-  name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
-  entry="{url:\"${url_b64}\",name:\"${name_b64}\"}"
-  if [ -z "$server_entries" ]; then
-    server_entries="$entry"
-  else
-    server_entries="${server_entries},${entry}"
-  fi
-  index=$((index + 1))
-done
-
-{
-  cat <<'PREAMBLE'
+  {
+    cat <<'PREAMBLE'
 function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}
 PREAMBLE
 
-  printf 'var configuredServers = [%s];\n' "$server_entries"
-  printf 'var forceDefaultMode = "%s";\n' "$force_mode"
-  printf 'var configuredDefaultIndex = %s;\n' "$default_server_index"
-  printf 'var appTitle = "%s";\n' "$app_title_b64"
+    printf 'var configuredServers = [{url:"%s",name:"%s"}];\n' "$url_b64" "$name_b64"
+    printf 'var appTitle = "%s";\n' "$app_title_b64"
 
-  cat "$runtime_bundle_path"
-} > "$runtime_config_path"
+    cat "$runtime_bundle_path"
+  } > "$output_path"
+}
+
+rm -rf "$vhosts_root"
+mkdir -p "$vhosts_root"
+rm -rf "$unmatched_root"
+mkdir -p "$unmatched_root"
+cat > "$unmatched_root/404.html" <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>404 Not Found</title>
+  </head>
+  <body>
+    <h1>404 Not Found</h1>
+  </body>
+</html>
+EOF
+
+index=1
+while [ "$index" -le "$max_index" ]; do
+  host_value="$(get_env "SERVER_${index}_HOST")"
+  backend_value="$(get_env "SERVER_${index}_BACKEND")"
+  normalized_host="$(normalize_host "$host_value")"
+  normalized_backend="$(normalize_url "$backend_value")"
+  server_name="$(get_env "SERVER_${index}_NAME")"
+  app_title=""
+  app_title_var="SERVER_${index}_APP_TITLE"
+  if has_env "$app_title_var"; then
+    app_title="$(get_env "$app_title_var")"
+  fi
+
+  if [ "$index" -eq 1 ]; then
+    write_runtime_config "$normalized_backend" "$server_name" "$app_title" "$runtime_config_path"
+  fi
+
+  vhost_root="$vhosts_root/$normalized_host"
+  mkdir -p "$vhost_root"
+  for item in "$public_root"/*; do
+    name="${item##*/}"
+    if [ "$name" = "runtime-config.js" ]; then
+      continue
+    fi
+    cp -R "$item" "$vhost_root/$name"
+  done
+  write_runtime_config "$normalized_backend" "$server_name" "$app_title" "$vhost_root/runtime-config.js"
+
+  index=$((index + 1))
+done
+
+sed "s|root = \"/opt/opencode-web/public\"|root = \"$unmatched_root\"|" "$base_sws_template_path" > "$generated_sws_config_path"
+
+cat >> "$generated_sws_config_path" <<'EOF'
+
+[[advanced.rewrites]]
+source = "/runtime-config.js"
+destination = "/runtime-config.js"
+
+[[advanced.rewrites]]
+source = "/opencode-web-customizations.css"
+destination = "/opencode-web-customizations.css"
+
+[[advanced.rewrites]]
+source = "/assets/{**}"
+destination = "/assets/$1"
+EOF
+
+index=1
+while [ "$index" -le "$max_index" ]; do
+  normalized_host="$(normalize_host "$(get_env "SERVER_${index}_HOST")")"
+  {
+    printf '\n[[advanced.virtual-hosts]]\n'
+    printf 'host = "%s"\n' "$normalized_host"
+    printf 'root = "%s/%s"\n' "$vhosts_root" "$normalized_host"
+  } >> "$generated_sws_config_path"
+  index=$((index + 1))
+done
+
+mv "$generated_sws_config_path" "$base_sws_config_path"
 
 exec "$@"

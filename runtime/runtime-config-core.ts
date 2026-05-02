@@ -125,10 +125,6 @@ function buildConfiguredServers(existingByUrl: Record<string, ServerListItem>) {
   return { configuredUrls, mergedConfigured }
 }
 
-function listHasUrl(list: ServerListItem[], url: string): boolean {
-  return list.some((item) => storedUrl(item) === url)
-}
-
 export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
   const d: RuntimeConfigDeps = {
     localStorage: deps?.localStorage ?? localStorage,
@@ -153,7 +149,6 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
 
     const currentOrigin = normalizeUrl(d.location.origin)
     const persistedDefaultRaw = d.localStorage.getItem(defaultServerUrlKey) || ""
-    const persistedDefault = normalizeUrl(persistedDefaultRaw)
     const nextList: ServerListItem[] = []
 
     for (let i = 0; i < indexedState.entries.length; i++) {
@@ -161,11 +156,6 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
       if (entry.url && configuredUrls[entry.url]) continue
       if (currentOrigin && !configuredUrls[currentOrigin] && entry.url === currentOrigin) continue
       nextList.push(entry.item)
-    }
-
-    let effectivePersistedDefault = persistedDefault
-    if (currentOrigin && !configuredUrls[currentOrigin] && effectivePersistedDefault === currentOrigin) {
-      effectivePersistedDefault = ""
     }
 
     nextList.unshift(...mergedConfigured)
@@ -177,14 +167,6 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
     }
     const nextStateRaw = JSON.stringify(nextState)
     const bootstrapUrl = mergedConfigured[0]!.http!.url
-    const configuredDefault = mergedConfigured[configuredDefaultIndex - 1]
-    const fallbackDefaultUrl = configuredDefault?.http?.url ?? ""
-    const effectiveDefaultUrl =
-      forceDefaultMode !== "force" && effectivePersistedDefault && listHasUrl(nextList, effectivePersistedDefault)
-        ? effectivePersistedDefault
-        : fallbackDefaultUrl
-
-    if (!effectiveDefaultUrl) return
 
     d.window.__OPENCODE_SERVER_URL = bootstrapUrl
 
@@ -192,14 +174,8 @@ export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
       d.localStorage.setItem(serverStoreKey, nextStateRaw)
     }
 
-    if (
-      persistedDefaultRaw !== effectiveDefaultUrl &&
-      (forceDefaultMode === "force" ||
-        !persistedDefault ||
-        !listHasUrl(nextList, persistedDefault) ||
-        persistedDefaultRaw !== persistedDefault)
-    ) {
-      d.localStorage.setItem(defaultServerUrlKey, effectiveDefaultUrl)
+    if (persistedDefaultRaw !== bootstrapUrl) {
+      d.localStorage.setItem(defaultServerUrlKey, bootstrapUrl)
     }
   } catch (error) {
     d.console.warn("Failed to apply OpenCode runtime config", error)

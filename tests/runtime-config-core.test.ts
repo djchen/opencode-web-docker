@@ -53,20 +53,14 @@ afterAll(async () => {
 
 type GlobalMocks = {
   configuredServers: ConfiguredServer[]
-  forceDefaultMode: string
-  configuredDefaultIndex: number
   appTitle: string
 }
 
 function setupGlobals(mocks: Partial<GlobalMocks>): GlobalMocks {
   const configuredServers = mocks.configuredServers ?? []
-  const forceDefaultMode = mocks.forceDefaultMode ?? "force"
-  const configuredDefaultIndex = mocks.configuredDefaultIndex ?? 1
   const appTitle = mocks.appTitle ?? ""
 
   ;(globalThis as Record<string, unknown>).configuredServers = configuredServers
-  ;(globalThis as Record<string, unknown>).forceDefaultMode = forceDefaultMode
-  ;(globalThis as Record<string, unknown>).configuredDefaultIndex = configuredDefaultIndex
   ;(globalThis as Record<string, unknown>).appTitle = appTitle
   ;(globalThis as Record<string, unknown>)._b64d = (input: string): string => {
     if (!input) return ""
@@ -76,21 +70,17 @@ function setupGlobals(mocks: Partial<GlobalMocks>): GlobalMocks {
     return new TextDecoder().decode(bytes)
   }
 
-  return { configuredServers, forceDefaultMode, configuredDefaultIndex, appTitle }
+  return { configuredServers, appTitle }
 }
 
 function teardownGlobals() {
   delete (globalThis as Record<string, unknown>).configuredServers
-  delete (globalThis as Record<string, unknown>).forceDefaultMode
-  delete (globalThis as Record<string, unknown>).configuredDefaultIndex
   delete (globalThis as Record<string, unknown>).appTitle
   delete (globalThis as Record<string, unknown>)._b64d
 }
 
 function runWithDeps(input: {
   storage?: Record<string, string>
-  forceDefaultMode?: string
-  configuredDefaultIndex?: number
   appTitle?: string
   locationOrigin?: string
   configuredServers?: ConfiguredServer[]
@@ -116,15 +106,13 @@ function runWithDeps(input: {
       key: (_index: number) => null,
     },
     document: mockDocument as unknown as Document,
-    location: { origin: input.locationOrigin ?? "http://frontend.example.com" } as Location,
+    location: { origin: input.locationOrigin ?? "http://frontend.opencode.example.com" } as Location,
     window: mockWindow as unknown as Window & typeof globalThis,
     console: { warn: (...args: unknown[]) => warnings.push(args) },
   }
 
   setupGlobals({
     configuredServers: input.configuredServers ?? [],
-    forceDefaultMode: input.forceDefaultMode ?? "force",
-    configuredDefaultIndex: input.configuredDefaultIndex ?? 1,
     appTitle: input.appTitle ?? "",
   })
 
@@ -145,8 +133,6 @@ function runWithDeps(input: {
 
 async function runBundledRuntimeConfig(input: {
   storage?: Record<string, string>
-  forceDefaultMode?: string
-  configuredDefaultIndex?: number
   appTitle?: string
   locationOrigin?: string
   configuredServers?: ConfiguredServer[]
@@ -158,8 +144,6 @@ async function runBundledRuntimeConfig(input: {
   const script = [
     "function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}",
     `var configuredServers = ${JSON.stringify(input.configuredServers ?? [])};`,
-    `var forceDefaultMode = ${JSON.stringify(input.forceDefaultMode ?? "force")};`,
-    `var configuredDefaultIndex = ${JSON.stringify(input.configuredDefaultIndex ?? 1)};`,
     `var appTitle = ${JSON.stringify(input.appTitle ?? "")};`,
     bundleSource,
   ].join("\n")
@@ -172,7 +156,7 @@ async function runBundledRuntimeConfig(input: {
     atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
     console: { warn: (...args: unknown[]) => warnings.push(args) },
     document: { title: "OpenCode" },
-    location: { origin: input.locationOrigin ?? "http://frontend.example.com" },
+    location: { origin: input.locationOrigin ?? "http://frontend.opencode.example.com" },
     localStorage: {
       getItem: (key: string) => (storage.has(key) ? storage.get(key)! : null),
       setItem: (key: string, value: string) => {
@@ -198,7 +182,7 @@ async function runBundledRuntimeConfig(input: {
 }
 
 describe("runtime-config-core", () => {
-  test("keeps configured servers first, preserves extra servers, and removes location.origin fallback", () => {
+  test("keeps the injected server first, preserves extra servers, and removes location.origin fallback", () => {
     const state = {
       list: [
         {
@@ -206,7 +190,7 @@ describe("runtime-config-core", () => {
           http: { url: "http://persisted.example.com", username: "old-user", password: "old-pass" },
           displayName: "Persisted",
         },
-        { type: "http", http: { url: "http://frontend.example.com" }, displayName: "Frontend" },
+        { type: "http", http: { url: "http://frontend.opencode.example.com" }, displayName: "Frontend" },
         { type: "http", http: { url: "http://custom.example.com" }, displayName: "Custom" },
       ],
       projects: { keep: true },
@@ -214,15 +198,7 @@ describe("runtime-config-core", () => {
     }
 
     const result = runWithDeps({
-      forceDefaultMode: "force",
-      configuredDefaultIndex: 2,
-      configuredServers: [
-        configuredServer({ url: "http://persisted.example.com", name: "Renamed" }),
-        configuredServer({
-          url: "https://opencode-api2.example.com/",
-          name: "Server 2",
-        }),
-      ],
+      configuredServers: [configuredServer({ url: "http://persisted.example.com", name: "Renamed" })],
       storage: {
         [serverStoreKey]: JSON.stringify(state),
       },
@@ -231,64 +207,19 @@ describe("runtime-config-core", () => {
     const saved = savedServerState(result)
     expect(saved.projects).toEqual(state.projects)
     expect(saved.lastProject).toEqual(state.lastProject)
-    expect(savedServerUrls(result)).toEqual([
-      "http://persisted.example.com",
-      "https://opencode-api2.example.com",
-      "http://custom.example.com",
-    ])
+    expect(savedServerUrls(result)).toEqual(["http://persisted.example.com", "http://custom.example.com"])
     expect(saved.list[0].displayName).toBe("Renamed")
     expect(saved.list[0].http.username).toBe("old-user")
     expect(saved.list[0].http.password).toBe("old-pass")
     expect(result.setCalls.map((call) => call.key)).toEqual([serverStoreKey, defaultServerUrlKey])
     expect(result.window.__OPENCODE_SERVER_URL).toBe("http://persisted.example.com")
-    expect(result.storage.get(defaultServerUrlKey)).toBe("https://opencode-api2.example.com")
-  })
-
-  test("preserves a valid persisted default in preserve mode without rewriting it", () => {
-    const result = runWithDeps({
-      forceDefaultMode: "preserve",
-      configuredDefaultIndex: 1,
-      configuredServers: [
-        configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" }),
-        configuredServer({ url: "https://opencode-api2.example.com", name: "Server 2" }),
-      ],
-      storage: {
-        [defaultServerUrlKey]: "https://opencode-api2.example.com",
-        [serverStoreKey]: emptyServerStateRaw(),
-      },
-    })
-
-    expect(result.storage.get(defaultServerUrlKey)).toBe("https://opencode-api2.example.com")
-    expect(result.setCalls.some((call) => call.key === defaultServerUrlKey)).toBe(false)
-    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://opencode-api1.example.com")
-  })
-
-  test("normalizes a preserved default URL so it still matches a configured server", () => {
-    const result = runWithDeps({
-      forceDefaultMode: "preserve",
-      configuredDefaultIndex: 1,
-      configuredServers: [
-        configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" }),
-        configuredServer({ url: "https://opencode-api2.example.com", name: "Server 2" }),
-      ],
-      storage: {
-        [defaultServerUrlKey]: "https://opencode-api2.example.com/",
-        [serverStoreKey]: emptyServerStateRaw(),
-      },
-    })
-
-    const savedUrls = savedServerUrls(result)
-    const defaultServerUrl = result.storage.get(defaultServerUrlKey)
-
-    expect(savedUrls).toEqual(["https://opencode-api1.example.com", "https://opencode-api2.example.com"])
-    expect(defaultServerUrl).toBe("https://opencode-api2.example.com")
-    expect(savedUrls).toContain(defaultServerUrl!)
+    expect(result.storage.get(defaultServerUrlKey)).toBe("http://persisted.example.com")
   })
 
   test("skips localStorage writes when the effective config is unchanged", () => {
     const state = {
       list: [
-        { type: "http", http: { url: "https://opencode-api1.example.com" }, displayName: "Server 1" },
+        { type: "http", http: { url: "https://api1.opencode.example.com" }, displayName: "Server 1" },
         { type: "http", http: { url: "http://custom.example.com" }, displayName: "Custom" },
       ],
       projects: { keep: true },
@@ -296,29 +227,25 @@ describe("runtime-config-core", () => {
     }
 
     const result = runWithDeps({
-      forceDefaultMode: "force",
-      configuredDefaultIndex: 1,
-      configuredServers: [configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" })],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "Server 1" })],
       storage: {
-        [defaultServerUrlKey]: "https://opencode-api1.example.com",
+        [defaultServerUrlKey]: "https://api1.opencode.example.com",
         [serverStoreKey]: JSON.stringify(state),
       },
     })
 
     expect(result.setCalls).toHaveLength(0)
-    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://opencode-api1.example.com")
+    expect(result.window.__OPENCODE_SERVER_URL).toBe("https://api1.opencode.example.com")
   })
 
-  test("removes the current origin fallback and rewrites an invalid preserved default", () => {
+  test("removes the current origin fallback and forces the injected backend as default", () => {
     const result = runWithDeps({
-      forceDefaultMode: "preserve",
-      configuredDefaultIndex: 1,
-      configuredServers: [configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" })],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "Server 1" })],
       storage: {
-        [defaultServerUrlKey]: "http://frontend.example.com",
+        [defaultServerUrlKey]: "http://frontend.opencode.example.com",
         [serverStoreKey]: JSON.stringify({
           list: [
-            { type: "http", http: { url: "http://frontend.example.com" }, displayName: "Frontend" },
+            { type: "http", http: { url: "http://frontend.opencode.example.com" }, displayName: "Frontend" },
             { type: "http", http: { url: "http://custom.example.com" }, displayName: "Custom" },
           ],
           projects: {},
@@ -327,13 +254,13 @@ describe("runtime-config-core", () => {
       },
     })
 
-    expect(savedServerUrls(result)).toEqual(["https://opencode-api1.example.com", "http://custom.example.com"])
-    expect(result.storage.get(defaultServerUrlKey)).toBe("https://opencode-api1.example.com")
+    expect(savedServerUrls(result)).toEqual(["https://api1.opencode.example.com", "http://custom.example.com"])
+    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api1.opencode.example.com")
   })
 
   test("warns and recovers from an incompatible persisted store", () => {
     const result = runWithDeps({
-      configuredServers: [configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" })],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "Server 1" })],
       storage: {
         [serverStoreKey]: JSON.stringify({ list: {}, projects: null, lastProject: "broken" }),
       },
@@ -348,20 +275,20 @@ describe("runtime-config-core", () => {
 
   test("warns and recovers from malformed persisted JSON", () => {
     const result = runWithDeps({
-      configuredServers: [configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" })],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "Server 1" })],
       storage: {
         [serverStoreKey]: "not json",
       },
     })
 
-    expect(savedServerUrls(result)).toEqual(["https://opencode-api1.example.com"])
+    expect(savedServerUrls(result)).toEqual(["https://api1.opencode.example.com"])
     expect(savedServerState(result).projects).toEqual({})
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
   test("sets document.title when appTitle is configured", () => {
     const result = runWithDeps({
-      configuredServers: [configuredServer({ url: "https://opencode-api1.example.com", name: "Server 1" })],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "Server 1" })],
       storage: {
         [serverStoreKey]: emptyServerStateRaw(),
       },
@@ -403,15 +330,7 @@ describe("runtime-config-core", () => {
 
   test("bundled runtime artifact executes correctly with unicode metadata", async () => {
     const result = await runBundledRuntimeConfig({
-      forceDefaultMode: "force",
-      configuredDefaultIndex: 2,
-      configuredServers: [
-        configuredServer({
-          url: "https://opencode-api1.example.com",
-          name: "München",
-        }),
-        configuredServer({ url: "https://opencode-api2.example.com/", name: "東京" }),
-      ],
+      configuredServers: [configuredServer({ url: "https://api1.opencode.example.com", name: "München" })],
       appTitle: encodeBase64("你好 OpenCode"),
       storage: {
         [serverStoreKey]: emptyServerStateRaw(),
@@ -422,14 +341,12 @@ describe("runtime-config-core", () => {
 
     expect(result.document.title).toBe("你好 OpenCode")
     expect((result.window as { __OPENCODE_SERVER_URL?: string }).__OPENCODE_SERVER_URL).toBe(
-      "https://opencode-api1.example.com",
+      "https://api1.opencode.example.com",
     )
-    expect(result.storage.get(defaultServerUrlKey)).toBe("https://opencode-api2.example.com")
+    expect(result.storage.get(defaultServerUrlKey)).toBe("https://api1.opencode.example.com")
     expect(saved.list.map((item: { http: { url: string } }) => item.http.url)).toEqual([
-      "https://opencode-api1.example.com",
-      "https://opencode-api2.example.com",
+      "https://api1.opencode.example.com",
     ])
     expect(saved.list[0].displayName).toBe("München")
-    expect(saved.list[1].displayName).toBe("東京")
   })
 })
