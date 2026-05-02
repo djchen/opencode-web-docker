@@ -16,15 +16,17 @@
 - Root `bun test` runs only `./tests` because root `bunfig.toml` sets `[test].root = "./tests"`.
 - `tests/*.contracts.ts` encode every assumption this wrapper makes about upstream app internals and `config/nginx.conf.template`. If upstream changes break the wrapper, update the contract and the wrapper code together.
 - `bun ./build/check-runtime-config-compat.ts` is the same upstream-compat guard used during `docker build`.
+- CSP/cache headers are intentionally duplicated in `config/nginx.conf.template` and `runtime/generate-nginx-config.sh`; keep them in sync.
 
 ## Commands
 
 - First-time setup: `git submodule update --init --recursive`
+- Install root dependencies: `bun install --frozen-lockfile`
 - Root verification after edits: `bun test && bun run typecheck && bun run lint && bun run format:check`
 - Apply formatting: `bun run format`
 - Upstream compatibility check only: `bun ./build/check-runtime-config-compat.ts`
 - Runtime bundle only: `bun run build:runtime`
-- Focused root tests: `bun test tests/runtime-config-core.test.ts`, `bun test tests/prepare-static-web.test.ts`, `bun test tests/static-csp.test.ts`
+- Focused root tests: `bun test tests/<name>.test.ts`, for example `bun test tests/compatibility-contracts.test.ts`
 - Runtime/image regression check: `./scripts/test-runtime-config.sh --build`
 - End-to-end build: `docker build -t opencode-web-docker .`
 - Quick upstream app build smoke check: `bun run --cwd opencode/packages/app build`
@@ -34,5 +36,6 @@
 
 - CI workflow is `.github/workflows/ci.yml`; it also runs `actionlint` and `shellcheck` on repo-owned workflows and `*.sh` files outside `opencode/`.
 - Root `typecheck`, `lint`, and `format` scripts only cover `build/`, `runtime/`, and `tests/`; edits in `scripts/`, `config/`, or `.github/workflows/` need separate review/tooling.
+- Shell scripts are `/bin/sh`/Alpine-compatible; do not use Bash-only syntax in `runtime/generate-nginx-config.sh` or repo-owned `scripts/*.sh`.
 - Bun is pinned to `1.3.13` in `package.json`, `Dockerfile`, `.github/workflows/ci.yml`, and `@types/bun`; keep them in sync.
 - Upstream OpenCode’s default branch is `dev`, not `main`.
