@@ -70,7 +70,7 @@ raw_indexes=""
 env_names="$(env -0 | xargs -0 -n1 sh -c 'entry=$1; printf "%s\n" "${entry%%=*}"' sh)"
 for env_name in $env_names; do
   case "$env_name" in
-    OPENCODE_SERVER_*_URL|OPENCODE_SERVER_*_NAME|OPENCODE_SERVER_*_USERNAME|OPENCODE_SERVER_*_PASSWORD)
+    OPENCODE_SERVER_*_URL|OPENCODE_SERVER_*_NAME)
       suffixless="${env_name#OPENCODE_SERVER_}"
       index="${suffixless%%_*}"
       case "$index" in
@@ -153,10 +153,7 @@ while [ "$index" -le "$max_index" ]; do
   url_value="$(printf '%s\n' "$normalized_urls" | sed -n "${index}p")"
   url_b64="$(encode_base64 "$url_value")"
   name_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_NAME")")"
-  username_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_USERNAME")")"
-  password_b64="$(encode_base64 "$(get_env "OPENCODE_SERVER_${index}_PASSWORD")")"
-
-  entry="{url:\"${url_b64}\",name:\"${name_b64}\",username:\"${username_b64}\",password:\"${password_b64}\"}"
+  entry="{url:\"${url_b64}\",name:\"${name_b64}\"}"
   if [ -z "$server_entries" ]; then
     server_entries="$entry"
   else

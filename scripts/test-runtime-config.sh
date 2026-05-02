@@ -133,8 +133,6 @@ expect_generated_runtime_config_applies() {
       const savedList = savedState.list.map((item) => ({
         url: item.http?.url ?? item.url,
         name: item.displayName ?? "",
-        username: item.http?.username ?? "",
-        password: item.http?.password ?? "",
       }))
 
       if (context.document.title !== expectedTitle) {
@@ -254,7 +252,7 @@ expect_generated_runtime_config_applies \
   "Hosted OpenCode" \
   "http://api1.example.com" \
   "https://api2.example.com" \
-  '[{"url":"http://api1.example.com","name":"Server 1","username":"","password":""},{"url":"https://api2.example.com","name":"","username":"","password":""}]' \
+  '[{"url":"http://api1.example.com","name":"Server 1"},{"url":"https://api2.example.com","name":""}]' \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=api1.example.com \
     -e OPENCODE_SERVER_1_NAME=Server\ 1 \
@@ -269,12 +267,10 @@ expect_generated_runtime_config_applies \
   "你好 OpenCode" \
   "https://api1.example.com" \
   "https://api2.example.com" \
-  '[{"url":"https://api1.example.com","name":"München","username":"álîcè","password":"pässwörd"},{"url":"https://api2.example.com","name":"東京","username":"","password":""}]' \
+  '[{"url":"https://api1.example.com","name":"München"},{"url":"https://api2.example.com","name":"東京"}]' \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=https://api1.example.com \
     -e OPENCODE_SERVER_1_NAME=München \
-    -e OPENCODE_SERVER_1_USERNAME=álîcè \
-    -e OPENCODE_SERVER_1_PASSWORD=pässwörd \
     -e OPENCODE_SERVER_2_URL=https://api2.example.com/ \
     -e OPENCODE_SERVER_2_NAME=東京 \
     -e OPENCODE_FORCE_DEFAULT_SERVER=2 \
@@ -298,7 +294,7 @@ expect_generated_runtime_config_applies \
   "OpenCode" \
   "https://api1.example.com" \
   "https://api2.example.com" \
-  '[{"url":"https://api1.example.com","name":"","username":"","password":""},{"url":"https://api2.example.com","name":"","username":"","password":""}]' \
+  '[{"url":"https://api1.example.com","name":""},{"url":"https://api2.example.com","name":""}]' \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=HTTPS://API1.EXAMPLE.COM \
     -e OPENCODE_SERVER_2_URL=HTTPS://API2.EXAMPLE.COM/ \
@@ -311,7 +307,7 @@ expect_generated_runtime_config_applies \
   "OpenCode" \
   "https://api.example.com/pAtH" \
   "https://api.example.com/pAtH" \
-  '[{"url":"https://api.example.com/pAtH","name":"","username":"","password":""}]' \
+  '[{"url":"https://api.example.com/pAtH","name":""}]' \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=HTTPS://API.EXAMPLE.COM/pAtH \
     "$image_tag" \
@@ -322,7 +318,7 @@ expect_generated_runtime_config_applies \
   "OpenCode" \
   "http://api.example.com:8080" \
   "http://api.example.com:8080" \
-  '[{"url":"http://api.example.com:8080","name":"","username":"","password":""}]' \
+  '[{"url":"http://api.example.com:8080","name":""}]' \
   docker run --rm \
     -e OPENCODE_SERVER_1_URL=HTTP://API.EXAMPLE.COM:8080 \
     "$image_tag" \

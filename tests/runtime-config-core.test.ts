@@ -14,12 +14,12 @@ const encodeBase64 = (value: string): string => Buffer.from(value, "utf8").toStr
 const emptyServerState = () => ({ list: [], projects: {}, lastProject: {} })
 const emptyServerStateRaw = () => JSON.stringify(emptyServerState())
 
-function configuredServer(input: { url: string; name?: string; username?: string; password?: string }) {
+type ConfiguredServer = { url: string; name: string }
+
+function configuredServer(input: { url: string; name?: string }) {
   return {
     url: encodeBase64(input.url),
     name: encodeBase64(input.name ?? ""),
-    username: encodeBase64(input.username ?? ""),
-    password: encodeBase64(input.password ?? ""),
   }
 }
 
@@ -52,7 +52,7 @@ afterAll(async () => {
 })
 
 type GlobalMocks = {
-  configuredServers: Array<{ url: string; name: string; username: string; password: string }>
+  configuredServers: ConfiguredServer[]
   forceDefaultMode: string
   configuredDefaultIndex: number
   appTitle: string
@@ -93,7 +93,7 @@ function runWithDeps(input: {
   configuredDefaultIndex?: number
   appTitle?: string
   locationOrigin?: string
-  configuredServers?: Array<{ url: string; name: string; username: string; password: string }>
+  configuredServers?: ConfiguredServer[]
 }) {
   const storage = new Map(Object.entries(input.storage ?? {}))
   const warnings: unknown[][] = []
@@ -149,7 +149,7 @@ async function runBundledRuntimeConfig(input: {
   configuredDefaultIndex?: number
   appTitle?: string
   locationOrigin?: string
-  configuredServers?: Array<{ url: string; name: string; username: string; password: string }>
+  configuredServers?: ConfiguredServer[]
 }) {
   const bundleSource = await loadBundledRuntimeSource()
   const storage = new Map(Object.entries(input.storage ?? {}))
@@ -221,8 +221,6 @@ describe("runtime-config-core", () => {
         configuredServer({
           url: "https://opencode-api2.example.com/",
           name: "Server 2",
-          username: "alice",
-          password: "secret",
         }),
       ],
       storage: {
@@ -241,8 +239,6 @@ describe("runtime-config-core", () => {
     expect(saved.list[0].displayName).toBe("Renamed")
     expect(saved.list[0].http.username).toBe("old-user")
     expect(saved.list[0].http.password).toBe("old-pass")
-    expect(saved.list[1].http.username).toBe("alice")
-    expect(saved.list[1].http.password).toBe("secret")
     expect(result.setCalls.map((call) => call.key)).toEqual([serverStoreKey, defaultServerUrlKey])
     expect(result.window.__OPENCODE_SERVER_URL).toBe("http://persisted.example.com")
     expect(result.storage.get(defaultServerUrlKey)).toBe("https://opencode-api2.example.com")
@@ -413,8 +409,6 @@ describe("runtime-config-core", () => {
         configuredServer({
           url: "https://opencode-api1.example.com",
           name: "München",
-          username: "álîcè",
-          password: "pässwörd",
         }),
         configuredServer({ url: "https://opencode-api2.example.com/", name: "東京" }),
       ],
@@ -436,8 +430,6 @@ describe("runtime-config-core", () => {
       "https://opencode-api2.example.com",
     ])
     expect(saved.list[0].displayName).toBe("München")
-    expect(saved.list[0].http.username).toBe("álîcè")
-    expect(saved.list[0].http.password).toBe("pässwörd")
     expect(saved.list[1].displayName).toBe("東京")
   })
 })
