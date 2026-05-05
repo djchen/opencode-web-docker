@@ -190,7 +190,7 @@ write_runtime_config() {
 function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}
 PREAMBLE
 
-    printf 'var configuredServers = [{url:"%s",name:"%s"}];\n' "$url_b64" "$name_b64"
+    printf 'var configuredServer = {url:"%s",name:"%s"};\n' "$url_b64" "$name_b64"
     printf 'var appTitle = "%s";\n' "$app_title_b64"
 
     cat "$runtime_bundle_path"

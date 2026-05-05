@@ -1,91 +1,111 @@
-import { readFile } from "node:fs/promises"
-import path from "node:path"
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 export interface Check {
-  file: string
-  message: string
-  test: (files: Record<string, string>) => boolean
+	file: string;
+	message: string;
+	test: (files: Record<string, string>) => boolean;
 }
 
 export interface Contract {
-  area: string
-  hint?: string
-  checks: Check[]
+	area: string;
+	hint?: string;
+	checks: Check[];
 }
 
-export type Sources = Record<string, string>
+export type Sources = Record<string, string>;
 
-export const match = (file: string, pattern: RegExp, message: string): Check => ({
-  file,
-  message,
-  test: (files) => pattern.test(files[file]!),
-})
+export const match = (
+	file: string,
+	pattern: RegExp,
+	message: string,
+): Check => ({
+	file,
+	message,
+	test: (files) => pattern.test(files[file]!),
+});
 
-export const every = (file: string, patterns: RegExp[], message: string): Check => ({
-  file,
-  message,
-  test: (files) => patterns.every((pattern) => pattern.test(files[file]!)),
-})
+export const every = (
+	file: string,
+	patterns: RegExp[],
+	message: string,
+): Check => ({
+	file,
+	message,
+	test: (files) => patterns.every((pattern) => pattern.test(files[file]!)),
+});
 
-export async function loadSources(root: string, sources: Sources): Promise<Record<string, string>> {
-  return Object.fromEntries(
-    await Promise.all(
-      Object.entries(sources).map(async ([key, relativePath]) => [
-        key,
-        await readFile(path.join(root, relativePath), "utf8"),
-      ]),
-    ),
-  )
+export async function loadSources(
+	root: string,
+	sources: Sources,
+): Promise<Record<string, string>> {
+	return Object.fromEntries(
+		await Promise.all(
+			Object.entries(sources).map(async ([key, relativePath]) => [
+				key,
+				await readFile(path.join(root, relativePath), "utf8"),
+			]),
+		),
+	);
 }
 
-export function validateContracts(sources: Sources, contracts: Contract[]): void {
-  const keys = new Set(Object.keys(sources))
-  const unknown = contracts.flatMap((contract) =>
-    contract.checks
-      .map((check) => check.file)
-      .filter((file) => !keys.has(file))
-      .map((file) => `${contract.area}: ${file}`),
-  )
+export function validateContracts(
+	sources: Sources,
+	contracts: Contract[],
+): void {
+	const keys = new Set(Object.keys(sources));
+	const unknown = contracts.flatMap((contract) =>
+		contract.checks
+			.map((check) => check.file)
+			.filter((file) => !keys.has(file))
+			.map((file) => `${contract.area}: ${file}`),
+	);
 
-  if (!unknown.length) return
+	if (!unknown.length) return;
 
-  throw new Error(
-    ["Invalid compatibility contracts.", ...unknown.map((entry) => `- unknown source key in contract: ${entry}`)].join(
-      "\n",
-    ),
-  )
+	throw new Error(
+		[
+			"Invalid compatibility contracts.",
+			...unknown.map((entry) => `- unknown source key in contract: ${entry}`),
+		].join("\n"),
+	);
 }
 
 export function runContracts(
-  files: Record<string, string>,
-  contracts: Contract[],
+	files: Record<string, string>,
+	contracts: Contract[],
 ): { area: string; message: string }[] {
-  return contracts.flatMap((contract) => {
-    return contract.checks
-      .filter((check) => !check.test(files))
-      .map((check) => ({
-        area: contract.area,
-        message: check.message,
-      }))
-  })
+	return contracts.flatMap((contract) => {
+		return contract.checks
+			.filter((check) => !check.test(files))
+			.map((check) => ({
+				area: contract.area,
+				message: check.message,
+			}));
+	});
 }
 
-export function formatFailures(failures: { area: string; message: string }[], contracts: Contract[] = []): string[] {
-  const hintsByArea = new Map<string, string>(contracts.filter((c) => c.hint).map((c) => [c.area, c.hint!]))
+export function formatFailures(
+	failures: { area: string; message: string }[],
+	contracts: Contract[] = [],
+): string[] {
+	const hintsByArea = new Map<string, string>(
+		contracts.filter((c) => c.hint).map((c) => [c.area, c.hint!]),
+	);
 
-  const grouped = new Map<string, string[]>()
+	const grouped = new Map<string, string[]>();
 
-  for (const failure of failures) {
-    const list = grouped.get(failure.area) ?? []
-    list.push(failure.message)
-    grouped.set(failure.area, list)
-  }
+	for (const failure of failures) {
+		const list = grouped.get(failure.area) ?? [];
+		list.push(failure.message);
+		grouped.set(failure.area, list);
+	}
 
-  return Array.from(grouped.entries()).flatMap(([area, messages]) => {
-    const lines = [`[${area}]`, ...messages.map((message) => `- ${message}`)]
-    const hint = hintsByArea.get(area)
-    if (hint) lines.push(`  → ${hint}`)
-    lines.push("")
-    return lines
-  })
+	return Array.from(grouped.entries()).flatMap(([area, messages]) => {
+		const lines = [`[${area}]`, ...messages.map((message) => `- ${message}`)];
+		const hint = hintsByArea.get(area);
+		if (hint) lines.push(`  → ${hint}`);
+		lines.push("");
+		return lines;
+	});
 }
