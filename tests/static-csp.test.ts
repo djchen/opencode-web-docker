@@ -31,20 +31,13 @@ describe("static CSP compatibility", () => {
 
 	test("does not override upstream directives when upstream starts defining them", () => {
 		const expected = buildExpectedStaticWebCsp(
-			"default-src 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'self'; connect-src 'self' data:;",
+			"default-src 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'self'; connect-src *;",
 		);
 
 		expect(expected.get("base-uri")).toEqual(["'none'"]);
 		expect(expected.get("frame-ancestors")).toEqual(["'self'"]);
 		expect(expected.get("object-src")).toEqual(["'self'"]);
-		expect(expected.get("connect-src")).toEqual([
-			"'self'",
-			"data:",
-			"http:",
-			"https:",
-			"ws:",
-			"wss:",
-		]);
+		expect(expected.get("connect-src")).toEqual(["*"]);
 	});
 
 	test("parses nginx add_header directives", () => {

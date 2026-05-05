@@ -200,14 +200,14 @@ PREAMBLE
 write_no_store_headers() {
   cat <<EOF
   add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' data: http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
+  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src *; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
 EOF
 }
 
 write_asset_headers() {
   cat <<EOF
     add_header Cache-Control "public, max-age=31536000, immutable" always;
-    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' data: http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src *; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
 EOF
 }
 
