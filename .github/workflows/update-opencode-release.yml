@@ -44,10 +44,16 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
       - name: Update submodule to target release
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: ./scripts/update-opencode-release.sh "$RELEASE_TAG"
+        run: bun run upstream:update -- "$RELEASE_TAG"
 
       - name: Detect submodule changes
         id: diff

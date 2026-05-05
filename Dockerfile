@@ -20,16 +20,16 @@ COPY --parents \
 RUN bun install --cwd opencode --frozen-lockfile --ignore-scripts
 
 COPY opencode ./opencode
-COPY package.json bun.lock tsconfig.json ./
+COPY package.json bun.lock tsconfig.json biome.json ./
 RUN bun install --frozen-lockfile
 COPY build ./build/
 COPY runtime ./runtime/
 COPY tests ./tests/
 COPY config ./config/
-RUN bun ./build/check-runtime-config-compat.ts
+RUN bun run test:compat
 RUN bun run build:runtime
 RUN bun run --cwd opencode/packages/app build
-RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
+RUN bun run build:prepare-static -- ./opencode/packages/app/dist
 RUN mkdir -p release/public release/runtime release/config \
  && cp -r config/. release/config/ \
  && cp dist/runtime/runtime-bundle.js release/runtime/ \
