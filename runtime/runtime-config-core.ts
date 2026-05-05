@@ -1,183 +1,141 @@
-import type { RuntimeConfigDeps, ServerListItem, ServerState } from "./types"
+import type { RuntimeConfigDeps, ServerListItem, ServerState } from "./types";
 
-const defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl"
-const serverStoreKey = "opencode.global.dat:server"
+const defaultServerUrlKey = "opencode.settings.dat:defaultServerUrl";
+const serverStoreKey = "opencode.global.dat:server";
+const legacyServerStoreKey = "server.v3";
 
 function warnIncompatibleStore(deps: RuntimeConfigDeps, reason: string) {
-  deps.console.warn(
-    "OpenCode runtime-config may be incompatible with this upstream build:",
-    reason,
-    "Review runtime/entrypoint.sh and runtime/runtime-config-core.ts against upstream app persistence.",
-  )
+	deps.console.warn(
+		"OpenCode runtime-config may be incompatible with this upstream build:",
+		reason,
+		"Review runtime/generate-nginx-config.sh and runtime/runtime-config-core.ts against upstream app persistence.",
+	);
 }
 
 function normalizeUrl(input: unknown): string {
-  if (typeof input !== "string") return ""
-  const trimmed = input.trim()
-  if (!trimmed) return ""
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
-  try {
-    const parsed = new URL(withProtocol)
-    parsed.protocol = parsed.protocol.toLowerCase()
-    parsed.hostname = parsed.hostname.toLowerCase()
-    parsed.pathname = parsed.pathname.replace(/\/+$/, "")
-    return parsed.toString().replace(/\/+$/, "")
-  } catch {
-    return withProtocol.replace(/\/+$/, "")
-  }
+	if (typeof input !== "string") return "";
+	const trimmed = input.trim();
+	if (!trimmed) return "";
+	const withProtocol = /^https?:\/\//i.test(trimmed)
+		? trimmed
+		: `http://${trimmed}`;
+	try {
+		const parsed = new URL(withProtocol);
+		parsed.protocol = parsed.protocol.toLowerCase();
+		parsed.hostname = parsed.hostname.toLowerCase();
+		parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+		return parsed.toString().replace(/\/+$/, "");
+	} catch {
+		return withProtocol.replace(/\/+$/, "");
+	}
 }
 
-function readState(deps: RuntimeConfigDeps): { raw: string | null; state: ServerState } {
-  const raw = deps.localStorage.getItem(serverStoreKey)
-  const empty: ServerState = { list: [], projects: {}, lastProject: {} }
+function readState(deps: RuntimeConfigDeps): {
+	raw: string | null;
+	state: ServerState;
+} {
+	const raw = deps.localStorage.getItem(serverStoreKey);
+	const empty: ServerState = { list: [], projects: {}, lastProject: {} };
 
-  try {
-    const parsed = JSON.parse(raw || "null") as ServerState | null
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      if (parsed !== null) warnIncompatibleStore(deps, "server store is not an object")
-      return { raw, state: empty }
-    }
+	try {
+		const parsed = JSON.parse(raw || "null") as ServerState | null;
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+			if (parsed !== null)
+				warnIncompatibleStore(deps, "server store is not an object");
+			return { raw, state: empty };
+		}
 
-    if (!Array.isArray(parsed.list)) {
-      warnIncompatibleStore(deps, "server store list is not an array")
-      parsed.list = []
-    }
-    if (!parsed.projects || typeof parsed.projects !== "object") {
-      warnIncompatibleStore(deps, "server store projects is not an object")
-      parsed.projects = {}
-    }
-    if (!parsed.lastProject || typeof parsed.lastProject !== "object") {
-      warnIncompatibleStore(deps, "server store lastProject is not an object")
-      parsed.lastProject = {}
-    }
+		if (!Array.isArray(parsed.list)) {
+			warnIncompatibleStore(deps, "server store list is not an array");
+			parsed.list = [];
+		}
+		if (!parsed.projects || typeof parsed.projects !== "object") {
+			warnIncompatibleStore(deps, "server store projects is not an object");
+			parsed.projects = {};
+		}
+		if (!parsed.lastProject || typeof parsed.lastProject !== "object") {
+			warnIncompatibleStore(deps, "server store lastProject is not an object");
+			parsed.lastProject = {};
+		}
 
-    return { raw, state: parsed }
-  } catch {
-    warnIncompatibleStore(deps, "failed to parse persisted server store JSON")
-    return { raw, state: { ...empty } }
-  }
+		return { raw, state: parsed };
+	} catch {
+		warnIncompatibleStore(deps, "failed to parse persisted server store JSON");
+		return { raw, state: { ...empty } };
+	}
 }
 
-function storedUrl(item: unknown): string {
-  if (typeof item === "string") return normalizeUrl(item)
-  if (!item || typeof item !== "object") return ""
-  const obj = item as Record<string, unknown>
-  if (obj.type && obj.http && typeof (obj.http as Record<string, unknown>).url === "string") {
-    return normalizeUrl((obj.http as Record<string, unknown>).url as string)
-  }
-  if (typeof obj.url === "string") return normalizeUrl(obj.url)
-  return ""
+function isLocalHost(url: string) {
+	const host = url.replace(/^https?:\/\//, "").split(":")[0];
+	if (host === "localhost" || host === "127.0.0.1") return true;
 }
 
-interface ExistingStateIndex {
-  byUrl: Record<string, ServerListItem>
-  entries: Array<{ item: ServerListItem; url: string }>
+function projectsKey(key: string) {
+	if (!key) return "";
+	if (key === "sidecar") return "local";
+	if (isLocalHost(key)) return "local";
+	return key;
 }
 
-function buildExistingStateIndex(list: ServerListItem[]): ExistingStateIndex {
-  const byUrl: Record<string, ServerListItem> = Object.create(null)
-  const entries: ExistingStateIndex["entries"] = []
-
-  for (let i = 0; i < list.length; i++) {
-    const item = list[i]!
-    const url = storedUrl(item)
-    if (url && !byUrl[url]) byUrl[url] = item
-    entries.push({ item, url })
-  }
-
-  return { byUrl, entries }
+function keepRuntimeMetadata<T>(values: Record<string, T>, runtimeKey: string) {
+	const key = projectsKey(runtimeKey);
+	if (!key || !(key in values)) return {};
+	return { [key]: values[key]! };
 }
 
-function buildConfiguredServers(existingByUrl: Record<string, ServerListItem>) {
-  const configuredUrls: Record<string, boolean> = Object.create(null)
-  const mergedConfigured: ServerListItem[] = []
+function buildRuntimeServer() {
+	const serverUrl = normalizeUrl(_b64d(configuredServer.url));
+	const serverName = _b64d(configuredServer.name).trim();
+	const server: ServerListItem = {
+		type: "http",
+		http: { url: serverUrl },
+	};
 
-  for (let i = 0; i < configuredServers.length; i++) {
-    const server = configuredServers[i]
-    if (!server) continue
-    const serverUrl = normalizeUrl(_b64d(server.url))
-    if (!serverUrl) continue
+	if (serverName) server.displayName = serverName;
 
-    configuredUrls[serverUrl] = true
-
-    const existing = existingByUrl[serverUrl]
-    const nextHttp: NonNullable<ServerListItem["http"]> = { url: serverUrl }
-    const next: ServerListItem = {
-      type: "http",
-      http: nextHttp,
-    }
-
-    if (existing && typeof existing === "object") {
-      if (typeof existing.displayName === "string") next.displayName = existing.displayName
-      if (existing.http && typeof existing.http === "object") {
-        if (typeof existing.http.username === "string") nextHttp.username = existing.http.username
-        if (typeof existing.http.password === "string") nextHttp.password = existing.http.password
-      }
-    }
-
-    const serverName = _b64d(server.name).trim()
-
-    if (serverName) next.displayName = serverName
-
-    mergedConfigured.push(next)
-  }
-
-  return { configuredUrls, mergedConfigured }
+	return server;
 }
 
 export function initRuntimeConfig(deps?: Partial<RuntimeConfigDeps>): void {
-  const d: RuntimeConfigDeps = {
-    localStorage: deps?.localStorage ?? localStorage,
-    document: deps?.document ?? document,
-    location: deps?.location ?? location,
-    window: deps?.window ?? (window as Window & typeof globalThis),
-    console: deps?.console ?? console,
-  }
+	const d: RuntimeConfigDeps = {
+		localStorage: deps?.localStorage ?? localStorage,
+		document: deps?.document ?? document,
+		window: deps?.window ?? (window as Window & typeof globalThis),
+		console: deps?.console ?? console,
+	};
 
-  try {
-    const nextTitle = _b64d(appTitle).trim()
-    if (nextTitle) {
-      d.document.title = nextTitle
-    }
+	try {
+		const nextTitle = _b64d(appTitle).trim();
+		if (nextTitle) {
+			d.document.title = nextTitle;
+		}
 
-    const persisted = readState(d)
-    const state = persisted.state
-    const indexedState = buildExistingStateIndex(state.list)
-    const { configuredUrls, mergedConfigured } = buildConfiguredServers(indexedState.byUrl)
+		const persisted = readState(d);
+		const state = persisted.state;
+		const runtimeServer = buildRuntimeServer();
+		const persistedDefaultRaw =
+			d.localStorage.getItem(defaultServerUrlKey) || "";
+		const bootstrapUrl = runtimeServer.http!.url;
 
-    if (!mergedConfigured.length) return
+		const nextState: ServerState = {
+			list: [runtimeServer],
+			projects: keepRuntimeMetadata(state.projects, bootstrapUrl),
+			lastProject: keepRuntimeMetadata(state.lastProject, bootstrapUrl),
+		};
+		const nextStateRaw = JSON.stringify(nextState);
 
-    const currentOrigin = normalizeUrl(d.location.origin)
-    const persistedDefaultRaw = d.localStorage.getItem(defaultServerUrlKey) || ""
-    const nextList: ServerListItem[] = []
+		d.window.__OPENCODE_SERVER_URL = bootstrapUrl;
 
-    for (let i = 0; i < indexedState.entries.length; i++) {
-      const entry = indexedState.entries[i]!
-      if (entry.url && configuredUrls[entry.url]) continue
-      if (currentOrigin && !configuredUrls[currentOrigin] && entry.url === currentOrigin) continue
-      nextList.push(entry.item)
-    }
+		if (persisted.raw !== nextStateRaw) {
+			d.localStorage.setItem(serverStoreKey, nextStateRaw);
+		}
 
-    nextList.unshift(...mergedConfigured)
+		if (persistedDefaultRaw !== bootstrapUrl) {
+			d.localStorage.setItem(defaultServerUrlKey, bootstrapUrl);
+		}
 
-    const nextState: ServerState = {
-      list: nextList,
-      projects: state.projects,
-      lastProject: state.lastProject,
-    }
-    const nextStateRaw = JSON.stringify(nextState)
-    const bootstrapUrl = mergedConfigured[0]!.http!.url
-
-    d.window.__OPENCODE_SERVER_URL = bootstrapUrl
-
-    if (persisted.raw !== nextStateRaw) {
-      d.localStorage.setItem(serverStoreKey, nextStateRaw)
-    }
-
-    if (persistedDefaultRaw !== bootstrapUrl) {
-      d.localStorage.setItem(defaultServerUrlKey, bootstrapUrl)
-    }
-  } catch (error) {
-    d.console.warn("Failed to apply OpenCode runtime config", error)
-  }
+		d.localStorage.removeItem(legacyServerStoreKey);
+	} catch (error) {
+		d.console.warn("Failed to apply OpenCode runtime config", error);
+	}
 }

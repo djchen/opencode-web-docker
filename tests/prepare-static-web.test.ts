@@ -1,122 +1,148 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import path from "node:path"
-import os from "node:os"
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 import {
-  customizationCssFileName,
-  getReferencedJsPaths,
-  injectHtml,
-  patchBuiltJs,
-  prepareStaticWeb,
-} from "../build/prepare-static-web"
+	customizationCssFileName,
+	getReferencedJsPaths,
+	injectHtml,
+	patchBuiltJs,
+	prepareStaticWeb,
+} from "../build/prepare-static-web";
 
-const tempDirs: string[] = []
+const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
+	await Promise.all(
+		tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+	);
+});
 
 async function makeTempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), prefix))
-  tempDirs.push(dir)
-  return dir
+	const dir = await mkdtemp(path.join(os.tmpdir(), prefix));
+	tempDirs.push(dir);
+	return dir;
 }
 
 describe("prepare-static-web", () => {
-  test("injectHtml adds runtime-config and customization asset tags before the module script", () => {
-    const html = [
-      "<html>",
-      "  <head>",
-      '    <script type="module" src="/assets/app.js"></script>',
-      "  </head>",
-      "</html>",
-    ].join("\n")
+	test("injectHtml adds runtime-config and customization asset tags before the module script", () => {
+		const html = [
+			"<html>",
+			"  <head>",
+			'    <script type="module" src="/assets/app.js"></script>',
+			"  </head>",
+			"</html>",
+		].join("\n");
 
-    const updated = injectHtml(html)
+		const updated = injectHtml(html);
 
-    expect(updated).toContain('<script src="/runtime-config.js"></script>')
-    expect(updated).toContain(`<link rel="stylesheet" href="/${customizationCssFileName}">`)
-    expect(updated.indexOf("/runtime-config.js")).toBeLessThan(updated.indexOf('type="module"'))
-  })
+		expect(updated).toContain('<script src="/runtime-config.js"></script>');
+		expect(updated).toContain(
+			`<link rel="stylesheet" href="/${customizationCssFileName}">`,
+		);
+		expect(updated.indexOf("/runtime-config.js")).toBeLessThan(
+			updated.indexOf('type="module"'),
+		);
+	});
 
-  test("patchBuiltJs injects runtime bootstrap before location.origin fallback", () => {
-    const content = 'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":location.origin;'
-    const result = patchBuiltJs(content)
+	test("patchBuiltJs injects runtime bootstrap before location.origin fallback", () => {
+		const content =
+			'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":location.origin;';
+		const result = patchBuiltJs(content);
 
-    expect(result.patched).toBe(true)
-    expect(result.updated).toContain("window.__OPENCODE_SERVER_URL||location.origin")
-  })
+		expect(result.patched).toBe(true);
+		expect(result.updated).toContain(
+			"window.__OPENCODE_SERVER_URL||location.origin",
+		);
+	});
 
-  test("patchBuiltJs treats already-patched content as idempotent", () => {
-    const content =
-      'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":window.__OPENCODE_SERVER_URL||location.origin;'
-    const result = patchBuiltJs(content)
+	test("patchBuiltJs treats already-patched content as idempotent", () => {
+		const content =
+			'const x=location.hostname.includes("opencode.ai")?"http://localhost:9999":window.__OPENCODE_SERVER_URL||location.origin;';
+		const result = patchBuiltJs(content);
 
-    expect(result.serverUrlPatched).toBe(true)
-    expect(result.patched).toBe(false)
-    expect(result.updated).toBe(content)
-  })
+		expect(result.serverUrlPatched).toBe(true);
+		expect(result.patched).toBe(false);
+		expect(result.updated).toBe(content);
+	});
 
-  test("getReferencedJsPaths returns only local JS assets from index.html", () => {
-    const html = [
-      '<link rel="modulepreload" href="/assets/chunk-1.js?x=1">',
-      '<script type="module" src="./assets/app.js"></script>',
-      '<script src="https://cdn.example.com/remote.js"></script>',
-    ].join("\n")
+	test("getReferencedJsPaths returns only local JS assets from index.html", () => {
+		const html = [
+			'<link rel="modulepreload" href="/assets/chunk-1.js?x=1">',
+			'<script type="module" src="./assets/app.js"></script>',
+			'<script src="https://cdn.example.com/remote.js"></script>',
+		].join("\n");
 
-    expect(getReferencedJsPaths(html)).toEqual(["/assets/chunk-1.js", "./assets/app.js"])
-  })
+		expect(getReferencedJsPaths(html)).toEqual([
+			"/assets/chunk-1.js",
+			"./assets/app.js",
+		]);
+	});
 
-  test("prepareStaticWeb writes the customization asset and patches only referenced JS assets in place", async () => {
-    const distDir = await makeTempDir("prepare-static-web-dist-")
-    await writeFile(
-      path.join(distDir, "assets-app.js"),
-      'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
-    )
-    await writeFile(
-      path.join(distDir, "unused.js"),
-      'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
-    )
+	test("prepareStaticWeb writes the customization asset and patches only referenced JS assets in place", async () => {
+		const distDir = await makeTempDir("prepare-static-web-dist-");
+		await writeFile(
+			path.join(distDir, "assets-app.js"),
+			'const x=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
+		);
+		await writeFile(
+			path.join(distDir, "unused.js"),
+			'const y=window.location.hostname.includes("opencode.ai")?"http://localhost:4096":window.location.origin;',
+		);
 
-    await writeFile(
-      path.join(distDir, "index.html"),
-      '<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
-    )
+		await writeFile(
+			path.join(distDir, "index.html"),
+			'<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
+		);
 
-    await prepareStaticWeb(distDir)
+		await prepareStaticWeb(distDir);
 
-    const html = await readFile(path.join(distDir, "index.html"), "utf8")
-    const css = await readFile(path.join(distDir, customizationCssFileName), "utf8")
-    const js = await readFile(path.join(distDir, "assets-app.js"), "utf8")
-    const untouched = await readFile(path.join(distDir, "unused.js"), "utf8")
+		const html = await readFile(path.join(distDir, "index.html"), "utf8");
+		const css = await readFile(
+			path.join(distDir, customizationCssFileName),
+			"utf8",
+		);
+		const js = await readFile(path.join(distDir, "assets-app.js"), "utf8");
+		const untouched = await readFile(path.join(distDir, "unused.js"), "utf8");
 
-    expect(html).toContain("/runtime-config.js")
-    expect(html).toContain(`/${customizationCssFileName}`)
-    expect(css).toContain('[data-component="sidebar-rail"]')
-    expect(js).toContain("window.__OPENCODE_SERVER_URL||window.location.origin")
-    expect(untouched).not.toContain("window.__OPENCODE_SERVER_URL||window.location.origin")
-  })
+		expect(html).toContain("/runtime-config.js");
+		expect(html).toContain(`/${customizationCssFileName}`);
+		expect(css).toContain('[data-component="sidebar-rail"]');
+		expect(js).toContain(
+			"window.__OPENCODE_SERVER_URL||window.location.origin",
+		);
+		expect(untouched).not.toContain(
+			"window.__OPENCODE_SERVER_URL||window.location.origin",
+		);
+	});
 
-  test("prepareStaticWeb fails when no referenced JS asset contains the expected runtime patch target", async () => {
-    const distDir = await makeTempDir("prepare-static-web-missing-patch-")
+	test("prepareStaticWeb fails when no referenced JS asset contains the expected runtime patch target", async () => {
+		const distDir = await makeTempDir("prepare-static-web-missing-patch-");
 
-    await writeFile(path.join(distDir, "assets-app.js"), 'const x="no runtime-sensitive URL logic here";')
-    await writeFile(
-      path.join(distDir, "index.html"),
-      '<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
-    )
+		await writeFile(
+			path.join(distDir, "assets-app.js"),
+			'const x="no runtime-sensitive URL logic here";',
+		);
+		await writeFile(
+			path.join(distDir, "index.html"),
+			'<html><head><script type="module" src="/assets-app.js"></script></head><body></body></html>',
+		);
 
-    await expect(prepareStaticWeb(distDir)).rejects.toThrow("Failed to patch getCurrentUrl fallback in built JS.")
-  })
+		await expect(prepareStaticWeb(distDir)).rejects.toThrow(
+			"Failed to patch getCurrentUrl fallback in built JS.",
+		);
+	});
 
-  test("prepareStaticWeb rejects referenced JS assets outside the dist directory", async () => {
-    const distDir = await makeTempDir("prepare-static-web-escaped-asset-")
+	test("prepareStaticWeb rejects referenced JS assets outside the dist directory", async () => {
+		const distDir = await makeTempDir("prepare-static-web-escaped-asset-");
 
-    await writeFile(
-      path.join(distDir, "index.html"),
-      '<html><head><script type="module" src="../outside.js"></script></head><body></body></html>',
-    )
+		await writeFile(
+			path.join(distDir, "index.html"),
+			'<html><head><script type="module" src="../outside.js"></script></head><body></body></html>',
+		);
 
-    await expect(prepareStaticWeb(distDir)).rejects.toThrow("Referenced JS asset escapes dist dir: ../outside.js")
-  })
-})
+		await expect(prepareStaticWeb(distDir)).rejects.toThrow(
+			"Referenced JS asset escapes dist dir: ../outside.js",
+		);
+	});
+});

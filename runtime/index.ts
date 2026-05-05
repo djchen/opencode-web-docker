@@ -1,3 +1,3 @@
-import { initRuntimeConfig } from "./runtime-config-core"
+import { initRuntimeConfig } from "./runtime-config-core";
 
-initRuntimeConfig()
+initRuntimeConfig();

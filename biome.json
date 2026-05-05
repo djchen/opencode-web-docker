@@ -1,0 +1,27 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
+	"files": {
+		"includes": [
+			"**",
+			"!opencode",
+			"!node_modules",
+			"!dist",
+			"!generated",
+			"!cache",
+			"!bun.lock",
+			"!package-lock.json",
+			"!pnpm-lock.yaml",
+			"!yarn.lock"
+		]
+	},
+	"linter": {
+		"rules": {
+			"complexity": {
+				"useLiteralKeys": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
+			}
+		}
+	}
+}

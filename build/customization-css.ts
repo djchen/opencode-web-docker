@@ -122,4 +122,4 @@ export const customizationCss = `
     font-size: 12px !important;
   }
 }
-`.trim()
+`.trim();

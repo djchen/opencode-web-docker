@@ -100,25 +100,20 @@ encode_base64() {
 
 runtime_root="/opt/opencode-web"
 public_root="$runtime_root/public"
-config_root="$runtime_root/config"
-vhosts_root="$runtime_root/vhosts"
-unmatched_root="$runtime_root/unmatched-host"
+runtime_config_root="$runtime_root/runtime-configs"
 runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
-runtime_config_path="$public_root/runtime-config.js"
-base_sws_config_path="$config_root/sws.toml"
-base_sws_template_path="$config_root/sws.base.toml"
-generated_sws_config_path="$config_root/sws.generated.toml"
+nginx_template_path="$runtime_root/config/nginx.conf.template"
+nginx_config_path="/etc/nginx/conf.d/default.conf"
+nginx_servers_marker="# OPENCODE_WEB_GENERATED_SERVERS"
+
 if [ ! -r "$runtime_bundle_path" ]; then
   die "Missing runtime bundle at $runtime_bundle_path"
 fi
-if [ ! -r "$base_sws_config_path" ]; then
-  die "Missing SWS config at $base_sws_config_path"
+if [ ! -r "$nginx_template_path" ]; then
+  die "Missing nginx config template at $nginx_template_path"
 fi
-if [ ! -e "$base_sws_template_path" ]; then
-  cp "$base_sws_config_path" "$base_sws_template_path"
-fi
-if [ ! -r "$base_sws_template_path" ]; then
-  die "Missing base SWS config template at $base_sws_template_path"
+if [ ! -d "$public_root" ]; then
+  die "Missing public root at $public_root"
 fi
 
 raw_indexes=""
@@ -195,36 +190,74 @@ write_runtime_config() {
 function _b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return atob(s)}}
 PREAMBLE
 
-    printf 'var configuredServers = [{url:"%s",name:"%s"}];\n' "$url_b64" "$name_b64"
+    printf 'var configuredServer = {url:"%s",name:"%s"};\n' "$url_b64" "$name_b64"
     printf 'var appTitle = "%s";\n' "$app_title_b64"
 
     cat "$runtime_bundle_path"
   } > "$output_path"
 }
 
-rm -rf "$vhosts_root"
-mkdir -p "$vhosts_root"
-rm -rf "$unmatched_root"
-mkdir -p "$unmatched_root"
-cat > "$unmatched_root/404.html" <<'EOF'
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>404 Not Found</title>
-  </head>
-  <body>
-    <h1>404 Not Found</h1>
-  </body>
-</html>
+write_no_store_headers() {
+  cat <<EOF
+  add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+  add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' data: http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
 EOF
+}
+
+write_asset_headers() {
+  cat <<EOF
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' data: http: https: ws: wss:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;
+EOF
+}
+
+write_server_block() {
+  host="$1"
+  cat <<EOF
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name $host;
+  root /opt/opencode-web/public;
+  index index.html;
+$(write_no_store_headers)
+
+  location = /health {
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  location = /runtime-config.js {
+    alias /opt/opencode-web/runtime-configs/$host.js;
+  }
+
+  location ^~ /assets/ {
+$(write_asset_headers)
+    try_files \$uri =404;
+  }
+
+  location ~ \\.[^/]+$ {
+    try_files \$uri =404;
+  }
+
+  location / {
+    try_files \$uri \$uri/ /index.html;
+  }
+}
+EOF
+}
+
+rm -rf "$runtime_config_root"
+mkdir -p "$runtime_config_root"
+
+generated_servers_path="$(mktemp)"
+trap 'rm -f "$generated_servers_path"' EXIT
 
 index=1
 while [ "$index" -le "$max_index" ]; do
-  host_value="$(get_env "SERVER_${index}_HOST")"
-  backend_value="$(get_env "SERVER_${index}_BACKEND")"
-  normalized_host="$(normalize_host "$host_value")"
-  normalized_backend="$(normalize_url "$backend_value")"
+  normalized_host="$(normalize_host "$(get_env "SERVER_${index}_HOST")")"
+  normalized_backend="$(normalize_url "$(get_env "SERVER_${index}_BACKEND")")"
   server_name="$(get_env "SERVER_${index}_NAME")"
   app_title=""
   app_title_var="SERVER_${index}_APP_TITLE"
@@ -232,52 +265,14 @@ while [ "$index" -le "$max_index" ]; do
     app_title="$(get_env "$app_title_var")"
   fi
 
-  if [ "$index" -eq 1 ]; then
-    write_runtime_config "$normalized_backend" "$server_name" "$app_title" "$runtime_config_path"
-  fi
-
-  vhost_root="$vhosts_root/$normalized_host"
-  mkdir -p "$vhost_root"
-  for item in "$public_root"/*; do
-    name="${item##*/}"
-    if [ "$name" = "runtime-config.js" ]; then
-      continue
-    fi
-    cp -R "$item" "$vhost_root/$name"
-  done
-  write_runtime_config "$normalized_backend" "$server_name" "$app_title" "$vhost_root/runtime-config.js"
+  write_runtime_config "$normalized_backend" "$server_name" "$app_title" "$runtime_config_root/$normalized_host.js"
+  write_server_block "$normalized_host" >> "$generated_servers_path"
 
   index=$((index + 1))
 done
 
-sed "s|root = \"/opt/opencode-web/public\"|root = \"$unmatched_root\"|" "$base_sws_template_path" > "$generated_sws_config_path"
+if ! grep -F -x -- "$nginx_servers_marker" "$nginx_template_path" >/dev/null 2>&1; then
+  die "Missing nginx server marker in $nginx_template_path"
+fi
 
-cat >> "$generated_sws_config_path" <<'EOF'
-
-[[advanced.rewrites]]
-source = "/runtime-config.js"
-destination = "/runtime-config.js"
-
-[[advanced.rewrites]]
-source = "/opencode-web-customizations.css"
-destination = "/opencode-web-customizations.css"
-
-[[advanced.rewrites]]
-source = "/assets/{**}"
-destination = "/assets/$1"
-EOF
-
-index=1
-while [ "$index" -le "$max_index" ]; do
-  normalized_host="$(normalize_host "$(get_env "SERVER_${index}_HOST")")"
-  {
-    printf '\n[[advanced.virtual-hosts]]\n'
-    printf 'host = "%s"\n' "$normalized_host"
-    printf 'root = "%s/%s"\n' "$vhosts_root" "$normalized_host"
-  } >> "$generated_sws_config_path"
-  index=$((index + 1))
-done
-
-mv "$generated_sws_config_path" "$base_sws_config_path"
-
-exec "$@"
+sed "/^$nginx_servers_marker$/r $generated_servers_path" "$nginx_template_path" | sed "/^$nginx_servers_marker$/d" > "$nginx_config_path"
