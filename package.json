@@ -1,35 +1,34 @@
 {
-  "name": "opencode-web-docker",
-  "description": "OpenCode Web Docker",
-  "private": true,
-  "type": "module",
-  "packageManager": "bun@1.3.13",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/djchen/opencode-web-docker.git"
-  },
-  "homepage": "https://github.com/djchen/opencode-web-docker",
-  "bugs": {
-    "url": "https://github.com/djchen/opencode-web-docker/issues"
-  },
-  "scripts": {
-    "docker:build": "docker build -t opencode-web-docker .",
-    "upstream:update": "./scripts/update-opencode-release.sh",
-    "typecheck": "tsc --noEmit",
-    "build:runtime": "bun run build/transpile-runtime.ts",
-    "lint": "oxlint build/ runtime/ tests/",
-    "format": "prettier --write build/ runtime/ tests/",
-    "format:check": "prettier --check build/ runtime/ tests/"
-  },
-  "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@types/bun": "1.3.13",
-    "oxlint": "^1.62.0",
-    "prettier": "^3.8.3",
-    "typescript": "^6.0.3"
-  },
-  "prettier": {
-    "semi": false,
-    "printWidth": 120
-  }
+	"name": "opencode-web-docker",
+	"description": "OpenCode Web Docker",
+	"private": true,
+	"type": "module",
+	"packageManager": "bun@1.3.13",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/djchen/opencode-web-docker.git"
+	},
+	"homepage": "https://github.com/djchen/opencode-web-docker",
+	"bugs": {
+		"url": "https://github.com/djchen/opencode-web-docker/issues"
+	},
+	"scripts": {
+		"test": "bun test",
+		"docker:build": "docker build -t opencode-web-docker .",
+		"test:runtime-config": "bun scripts/test-runtime-config.ts",
+		"test:compat": "bun build/check-runtime-config-compat.ts",
+		"upstream:update": "bun scripts/update-opencode-release.ts",
+		"typecheck": "tsc --noEmit",
+		"build:runtime": "bun build/transpile-runtime.ts",
+		"build:prepare-static": "bun build/prepare-static-web.ts",
+		"lint": "biome lint build/ runtime/ tests/ scripts/ package.json tsconfig.json biome.json",
+		"format": "biome format --write build/ runtime/ tests/ scripts/ package.json tsconfig.json biome.json",
+		"format:check": "biome format build/ runtime/ tests/ scripts/ package.json tsconfig.json biome.json"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.8",
+		"@types/node": "^25.6.0",
+		"@types/bun": "1.3.13",
+		"typescript": "^6.0.3"
+	}
 }
