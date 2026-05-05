@@ -89,6 +89,7 @@ function parseCsp(csp: string): Map<string, string[]> {
 }
 
 function mergeValues(values: string[], additions: string[]): string[] {
+	if (values.includes("*")) return values;
 	return [...values, ...additions.filter((value) => !values.includes(value))];
 }
 
