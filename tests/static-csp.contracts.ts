@@ -43,7 +43,7 @@ const extraDirectives: Record<string, string[]> = {
 export const staticCspSources: Record<string, string> = {
 	nginxConfigTemplate: "config/nginx.conf.template",
 	runtimeGenerator: "runtime/generate-nginx-config.sh",
-	uiRoutes: "opencode/packages/opencode/src/server/routes/ui.ts",
+	uiShared: "opencode/packages/opencode/src/server/shared/ui.ts",
 };
 
 function extractUpstreamDefaultCsp(source: string): string {
@@ -142,7 +142,7 @@ export function matchesUpstreamStaticCsp(
 ): boolean {
 	return sameCsp(
 		parseCsp(extractNginxCsp(files["nginxConfigTemplate"]!)),
-		buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files["uiRoutes"]!)),
+		buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files["uiShared"]!)),
 	);
 }
 
