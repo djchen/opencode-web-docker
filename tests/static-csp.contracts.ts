@@ -51,12 +51,12 @@ const extraDirectives: Record<string, string[]> = {
 
 export const staticCspSources: Record<string, string> = {
   staticWebConfig: "config/sws.toml",
-  uiRoutes: "opencode/packages/opencode/src/server/routes/ui.ts",
+  uiShared: "opencode/packages/opencode/src/server/shared/ui.ts",
 }
 
 function extractUpstreamDefaultCsp(source: string): string {
   const cspMatch = source.match(upstreamDefaultCspPattern)
-  if (!cspMatch) throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts")
+  if (!cspMatch) throw new Error("Could not locate DEFAULT_CSP in upstream shared/ui.ts")
   return cspMatch[1]!
 }
 
@@ -116,7 +116,7 @@ function sameCsp(actual: Map<string, string[]>, expected: Map<string, string[]>)
 export function matchesUpstreamStaticCsp(files: Record<string, string>): boolean {
   return sameCsp(
     parseCsp(extractStaticWebCsp(files["staticWebConfig"]!)),
-    buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files["uiRoutes"]!)),
+    buildExpectedStaticWebCsp(extractUpstreamDefaultCsp(files["uiShared"]!)),
   )
 }
 
