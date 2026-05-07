@@ -72,7 +72,7 @@ jobs:
           _APP_KEY: ${{ secrets.APP_PRIVATE_KEY }}
         run: |
           if [ -z "$_APP_CLIENT_ID" ] || [ -z "$_APP_KEY" ]; then
-            printf '%s\n' "APP_CLIENT_ID and APP_PRIVATE_KEY secrets are required to create and approve automated update PRs."
+            printf '%s\n' "APP_CLIENT_ID and APP_PRIVATE_KEY secrets are required to create automated update PRs."
             exit 1
           fi
 
@@ -98,7 +98,7 @@ jobs:
             ## Summary
             - update the `opencode/` submodule to `${{ steps.release.outputs.tag }}`
             - keep OpenCode Web Docker aligned with the latest upstream OpenCode release
-            - merge automatically after the required CI checks pass and the automation approval is accepted
+            - merge automatically after the required CI checks pass
 
       # Auto-merge waits for branch protection, including required CI checks.
       # If checks fail, the PR remains open for inspection.
