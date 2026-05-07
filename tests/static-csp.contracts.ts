@@ -2,6 +2,9 @@ import { match } from "./core";
 import type { Contract } from "./core";
 
 const upstreamDefaultCspPattern = /const DEFAULT_CSP\s*=\s*"([^"]+)"/;
+const upstreamCspFunctionPattern =
+	/export const csp = \(hash = ""\) =>\s*\n\s*`(.+)`\s*\nexport const DEFAULT_CSP = csp\(\)/;
+const emptyHashInterpolationPattern = /\$\{hash \? `[^`]+` : ""\}/g;
 const addHeaderPattern = /add_header\s+([A-Za-z-]+)\s+"([^"]*)"\s+always;/g;
 const noStoreCacheControl = "no-store, no-cache, must-revalidate";
 const immutableCacheControl = "public, max-age=31536000, immutable";
@@ -48,9 +51,13 @@ export const staticCspSources: Record<string, string> = {
 
 function extractUpstreamDefaultCsp(source: string): string {
 	const cspMatch = source.match(upstreamDefaultCspPattern);
-	if (!cspMatch)
-		throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts");
-	return cspMatch[1]!;
+	if (cspMatch) return cspMatch[1]!;
+
+	const cspFunctionMatch = source.match(upstreamCspFunctionPattern);
+	if (cspFunctionMatch)
+		return cspFunctionMatch[1]!.replace(emptyHashInterpolationPattern, "");
+
+	throw new Error("Could not locate DEFAULT_CSP in upstream ui.ts");
 }
 
 function extractNginxCsp(source: string): string {
