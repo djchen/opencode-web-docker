@@ -36,13 +36,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          validate_release_tag() {
+            if ! printf '%s\n' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)*(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+              printf 'Invalid release tag: %s\n' "$1" >&2
+              exit 1
+            fi
+          }
+
           if [ -n "$INPUT_RELEASE_TAG" ]; then
             tag="$INPUT_RELEASE_TAG"
           else
             tag="$(gh release view --repo anomalyco/opencode --json tagName --jq .tagName)"
           fi
 
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          validate_release_tag "$tag"
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
