@@ -28,7 +28,7 @@ COPY tests ./tests/
 COPY config ./config/
 RUN bun run test:compat
 RUN bun run build:runtime
-RUN OPENCODE_CHANNEL=prod bun run --cwd opencode/packages/app build
+RUN OPENCODE_CHANNEL=prod bun run --cwd opencode/packages/app build -- --sourcemap false
 RUN bun run build:prepare-static -- ./opencode/packages/app/dist
 RUN mkdir -p release/public release/runtime release/config \
  && cp -r config/. release/config/ \
