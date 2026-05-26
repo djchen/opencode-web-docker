@@ -16,20 +16,19 @@ updates:
     patterns: ["*"]
     multi-ecosystem-group: wrapper-dependencies
     cooldown:
-      default-days: 3
+      default-days: 7
 
   - package-ecosystem: docker
     directory: "/"
     patterns: ["*"]
     multi-ecosystem-group: wrapper-dependencies
     cooldown:
-      default-days: 3
+      default-days: 7
 
   - package-ecosystem: bun
     directory: "/"
     patterns: ["*"]
     multi-ecosystem-group: wrapper-dependencies
     cooldown:
-      semver-patch-days: 2
-      semver-minor-days: 3
+      default-days: 7
       semver-major-days: 14

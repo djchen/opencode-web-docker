@@ -3,12 +3,13 @@ name: Validate
 on:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   runtime-config-regression:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -31,6 +32,8 @@ jobs:
 
   build-compat-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -62,6 +65,8 @@ jobs:
 
   actionlint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -87,12 +92,14 @@ jobs:
         uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d # v0.5.6
         with:
           advanced-security: false
-          inputs: .github/workflows
-          min-severity: medium
+          inputs: .github
+          min-severity: low
           min-confidence: medium
 
   shellcheck:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
