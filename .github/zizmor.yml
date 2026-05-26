@@ -1,0 +1,15 @@
+rules:
+  forbidden-uses:
+    config:
+      allow:
+        - actions/checkout
+        - actions/create-github-app-token
+        - docker/build-push-action
+        - docker/login-action
+        - docker/metadata-action
+        - docker/setup-buildx-action
+        - docker/setup-qemu-action
+        - oven-sh/setup-bun
+        - peter-evans/create-pull-request
+        - rhysd/actionlint
+        - zizmorcore/zizmor-action
