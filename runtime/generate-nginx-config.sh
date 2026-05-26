@@ -105,6 +105,7 @@ runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
 nginx_template_path="$runtime_root/config/nginx.conf.template"
 nginx_config_path="/etc/nginx/conf.d/default.conf"
 nginx_servers_marker="# OPENCODE_WEB_GENERATED_SERVERS"
+nginx_listen_port="8080"
 
 if [ ! -r "$runtime_bundle_path" ]; then
   die "Missing runtime bundle at $runtime_bundle_path"
@@ -216,8 +217,8 @@ write_server_block() {
   cat <<EOF
 
 server {
-  listen 80;
-  listen [::]:80;
+  listen $nginx_listen_port;
+  listen [::]:$nginx_listen_port;
   server_name $host;
   root /opt/opencode-web/public;
   index index.html;
@@ -248,8 +249,8 @@ $(write_asset_headers)
 EOF
 }
 
-rm -rf "$runtime_config_root"
 mkdir -p "$runtime_config_root"
+rm -f "$runtime_config_root"/*.js
 
 generated_servers_path="$(mktemp)"
 trap 'rm -f "$generated_servers_path"' EXIT

@@ -1,6 +1,12 @@
+client_body_temp_path /var/cache/nginx/client_temp;
+proxy_temp_path /var/cache/nginx/proxy_temp;
+fastcgi_temp_path /var/cache/nginx/fastcgi_temp;
+uwsgi_temp_path /var/cache/nginx/uwsgi_temp;
+scgi_temp_path /var/cache/nginx/scgi_temp;
+
 server {
-  listen 80 default_server;
-  listen [::]:80 default_server;
+  listen 8080 default_server;
+  listen [::]:8080 default_server;
   server_name _;
   add_header Cache-Control "no-store, no-cache, must-revalidate" always;
   add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src * data:; font-src 'self' data:; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'" always;

@@ -4,6 +4,8 @@ Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with
 
 The container serves the same built app on multiple hostnames, injects the matching backend and title for each hostname, and applies CSS customizations.
 
+The image runs nginx as the non-root `nginx` user and listens on container port `8080`. To expose it on host port 80, map `80:8080`.
+
 ## Quick Start
 ### OpenCode Server
 Run `opencode serve` to expose an endpoint that OpenCode clients can use.
@@ -29,7 +31,7 @@ docker compose up -d
 ```sh
 docker run -d \
   --name opencode-web \
-  -p 8080:80 \
+  -p 8080:8080 \
   -e SERVER_1_HOST=web1.opencode.example.com \
   -e SERVER_1_BACKEND=https://api1.opencode.example.com \
   -e SERVER_1_NAME='Server 1' \

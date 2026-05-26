@@ -1,3 +1,1 @@
-.github/CODEOWNERS @djchen
-.github/workflows/* @djchen
-.github/dependabot.yml @djchen
+* @djchen
