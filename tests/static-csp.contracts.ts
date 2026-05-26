@@ -198,13 +198,38 @@ export const staticCspContracts: Contract[] = [
 		checks: [
 			match(
 				"nginxConfigTemplate",
-				/listen 80 default_server;/,
-				"expected nginx default server to listen on IPv4 port 80",
+				/listen 8080 default_server;/,
+				"expected nginx default server to listen on IPv4 port 8080",
 			),
 			match(
 				"nginxConfigTemplate",
-				/listen \[::\]:80 default_server;/,
-				"expected nginx default server to listen on IPv6 port 80",
+				/listen \[::\]:8080 default_server;/,
+				"expected nginx default server to listen on IPv6 port 8080",
+			),
+			match(
+				"nginxConfigTemplate",
+				/client_body_temp_path \/var\/cache\/nginx\/client_temp;/,
+				"expected nginx client temp path to use a writable non-root directory",
+			),
+			match(
+				"nginxConfigTemplate",
+				/proxy_temp_path \/var\/cache\/nginx\/proxy_temp;/,
+				"expected nginx proxy temp path to use a writable non-root directory",
+			),
+			match(
+				"nginxConfigTemplate",
+				/fastcgi_temp_path \/var\/cache\/nginx\/fastcgi_temp;/,
+				"expected nginx fastcgi temp path to use a writable non-root directory",
+			),
+			match(
+				"nginxConfigTemplate",
+				/uwsgi_temp_path \/var\/cache\/nginx\/uwsgi_temp;/,
+				"expected nginx uwsgi temp path to use a writable non-root directory",
+			),
+			match(
+				"nginxConfigTemplate",
+				/scgi_temp_path \/var\/cache\/nginx\/scgi_temp;/,
+				"expected nginx scgi temp path to use a writable non-root directory",
 			),
 			match(
 				"nginxConfigTemplate",
@@ -220,6 +245,21 @@ export const staticCspContracts: Contract[] = [
 				"nginxConfigTemplate",
 				/^# OPENCODE_WEB_GENERATED_SERVERS$/m,
 				"expected nginx template to contain generated server marker",
+			),
+			match(
+				"runtimeGenerator",
+				/nginx_listen_port="8080"/,
+				"expected generated nginx server blocks to use container port 8080",
+			),
+			match(
+				"runtimeGenerator",
+				/listen \$nginx_listen_port;/,
+				"expected generated nginx IPv4 listeners to use the configured listen port",
+			),
+			match(
+				"runtimeGenerator",
+				/listen \[::\]:\$nginx_listen_port;/,
+				"expected generated nginx IPv6 listeners to use the configured listen port",
 			),
 			match(
 				"runtimeGenerator",

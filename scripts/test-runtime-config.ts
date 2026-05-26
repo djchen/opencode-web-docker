@@ -114,6 +114,13 @@ async function expectFinalImageLayout(
 			"test -f /opt/opencode-web/runtime/generate-nginx-config.sh",
 			"test -x /docker-entrypoint.d/40-opencode-web.sh",
 			"test -f /opt/opencode-web/runtime/runtime-bundle.js",
+			'test "$(id -un)" = nginx',
+			'test "$(id -gn)" = nginx',
+			'test "$(id -u)" -ne 0',
+			"test -w /etc/nginx/conf.d",
+			"test -w /opt/opencode-web/runtime-configs",
+			"test -w /var/cache/nginx/client_temp",
+			"test ! -w /opt/opencode-web/public",
 		].join(" && "),
 	]);
 }
@@ -224,7 +231,7 @@ async function withNginxContainer(
 			"wget",
 			"-q",
 			"--spider",
-			"http://127.0.0.1/health",
+			"http://127.0.0.1:8080/health",
 		]);
 		if (result.exitCode === 0) return containerId;
 		await Bun.sleep(1000);
@@ -435,6 +442,18 @@ try {
 			"sh",
 			"-lc",
 			"/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test ! -e /opt/opencode-web/public/runtime-config.js",
+		),
+	);
+	await expectSuccess(
+		"clean stale generated runtime config files",
+		dockerRun(
+			"-e",
+			"SERVER_1_HOST=web1.opencode.example.com",
+			"-e",
+			"SERVER_1_BACKEND=http://api1.opencode.example.com",
+			"sh",
+			"-lc",
+			"touch /opt/opencode-web/runtime-configs/stale.js && /docker-entrypoint.d/40-opencode-web.sh && test -d /opt/opencode-web/runtime-configs && test ! -e /opt/opencode-web/runtime-configs/stale.js && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js",
 		),
 	);
 	await expectSuccess(
@@ -659,7 +678,7 @@ try {
 				"--header=Host: web1.opencode.example.com",
 				"-O",
 				"-",
-				"http://127.0.0.1/runtime-config.js",
+				"http://127.0.0.1:8080/runtime-config.js",
 			],
 		);
 		await expectGeneratedRuntimeConfigApplies(
@@ -677,7 +696,7 @@ try {
 				"--header=Host: web2.opencode.example.com",
 				"-O",
 				"-",
-				"http://127.0.0.1/runtime-config.js",
+				"http://127.0.0.1:8080/runtime-config.js",
 			],
 		);
 		await expectGeneratedRuntimeConfigApplies(
@@ -692,10 +711,10 @@ try {
 				containerId,
 				"wget",
 				"-q",
-				"--header=Host: web2.opencode.example.com:80",
+				"--header=Host: web2.opencode.example.com:8080",
 				"-O",
 				"-",
-				"http://127.0.0.1/runtime-config.js",
+				"http://127.0.0.1:8080/runtime-config.js",
 			],
 		);
 		await expectSuccess("nginx unmatched host returns 404 except health", [
@@ -704,7 +723,7 @@ try {
 			containerId,
 			"sh",
 			"-lc",
-			'wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/health && ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/runtime-config.js && ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1/future/opencode/route',
+			'wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1:8080/health && ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1:8080/runtime-config.js && ! wget -q --spider --header="Host: unmatched.example.com" http://127.0.0.1:8080/future/opencode/route',
 		]);
 		await expectSuccess("nginx configured host SPA route returns app shell", [
 			"docker",
@@ -712,7 +731,7 @@ try {
 			containerId,
 			"sh",
 			"-lc",
-			'wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1/future/opencode/route | grep -q "/runtime-config.js"',
+			'wget -q --header="Host: web2.opencode.example.com" -O - http://127.0.0.1:8080/future/opencode/route | grep -q "/runtime-config.js"',
 		]);
 		await expectSuccess("nginx missing static file returns 404", [
 			"docker",
@@ -720,7 +739,7 @@ try {
 			containerId,
 			"sh",
 			"-lc",
-			'! wget -q --spider --header="Host: web2.opencode.example.com" http://127.0.0.1/missing.js',
+			'! wget -q --spider --header="Host: web2.opencode.example.com" http://127.0.0.1:8080/missing.js',
 		]);
 		await expectSuccess(
 			"configured host app shell has no-store and CSP headers",
@@ -730,7 +749,7 @@ try {
 				containerId,
 				"sh",
 				"-lc",
-				'headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null http://127.0.0.1/ 2>&1)"; printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"',
+				'headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null http://127.0.0.1:8080/ 2>&1)"; printf "%s\n" "$headers" | grep -qi "cache-control.*no-store" && printf "%s\n" "$headers" | grep -qi "content-security-policy"',
 			],
 		);
 		await expectSuccess("hashed assets have long-lived cache headers", [
@@ -742,7 +761,7 @@ try {
 			[
 				"set -- /opt/opencode-web/public/assets/*",
 				`asset="\${1##*/}"`,
-				'headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null "http://127.0.0.1/assets/$asset" 2>&1)"',
+				'headers="$(wget -qS --header="Host: web1.opencode.example.com" -O /dev/null "http://127.0.0.1:8080/assets/$asset" 2>&1)"',
 				'printf "%s\n" "$headers" | grep -qi "cache-control.*immutable"',
 				'printf "%s\n" "$headers" | grep -qi "content-security-policy"',
 			].join(" && "),

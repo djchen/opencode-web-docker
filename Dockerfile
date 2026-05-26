@@ -54,11 +54,28 @@ WORKDIR /opt/opencode-web
 COPY --from=build /opt/opencode-web/release/ ./
 COPY --from=build /opt/opencode-web/release/runtime/generate-nginx-config.sh /docker-entrypoint.d/40-opencode-web.sh
 
-RUN chmod +x /docker-entrypoint.d/40-opencode-web.sh
+RUN sed -i '/^pid /d' /etc/nginx/nginx.conf \
+  && rm -f /etc/nginx/conf.d/default.conf \
+  && mkdir -p \
+    /etc/nginx/conf.d \
+    /opt/opencode-web/runtime-configs \
+    /var/cache/nginx/client_temp \
+    /var/cache/nginx/proxy_temp \
+    /var/cache/nginx/fastcgi_temp \
+    /var/cache/nginx/uwsgi_temp \
+    /var/cache/nginx/scgi_temp \
+  && chown -R nginx:nginx \
+    /etc/nginx/conf.d \
+    /opt/opencode-web/runtime-configs \
+    /var/cache/nginx \
+  && chmod +x /docker-entrypoint.d/40-opencode-web.sh \
+  && chmod -R a-w /opt/opencode-web/public
 
-EXPOSE 80
+USER nginx:nginx
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=1m --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1/health || exit 1
+  CMD wget -q --spider http://127.0.0.1:8080/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["nginx", "-g", "pid /tmp/nginx.pid; daemon off;"]

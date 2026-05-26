@@ -2,7 +2,7 @@ services:
   web:
     image: ghcr.io/djchen/opencode-web-docker
     ports:
-      - 8080:80
+      - 8080:8080
     environment:
       SERVER_1_HOST: web1.opencode.example.com
       SERVER_1_BACKEND: https://api1.opencode.example.com
