@@ -90,7 +90,6 @@ jobs:
           inputs: .github/workflows
           min-severity: medium
           min-confidence: medium
-          version: v1.25.2
 
   shellcheck:
     runs-on: ubuntu-latest
