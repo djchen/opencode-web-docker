@@ -17,7 +17,7 @@ COPY --parents \
   opencode/./packages/**/package.json \
   ./opencode/
 
-RUN bun install --cwd opencode --frozen-lockfile --ignore-scripts
+RUN bun install --cwd opencode --filter @opencode-ai/app --frozen-lockfile --ignore-scripts
 
 COPY opencode ./opencode
 COPY package.json bun.lock tsconfig.json biome.json ./
