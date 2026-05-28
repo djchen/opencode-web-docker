@@ -20,16 +20,15 @@ COPY --parents \
 RUN bun install --cwd opencode --filter @opencode-ai/app --frozen-lockfile --ignore-scripts
 
 COPY opencode ./opencode
-COPY package.json bun.lock tsconfig.json biome.json ./
-RUN bun install --frozen-lockfile
+# Keep wrapper-only edits from invalidating the upstream app build layer.
+RUN OPENCODE_CHANNEL=prod bun run --cwd opencode/packages/app build -- --sourcemap false
 COPY build ./build/
 COPY runtime ./runtime/
 COPY tests ./tests/
 COPY config ./config/
-RUN bun run test:compat
-RUN bun run build:runtime
-RUN OPENCODE_CHANNEL=prod bun run --cwd opencode/packages/app build -- --sourcemap false
-RUN bun run build:prepare-static -- ./opencode/packages/app/dist
+RUN bun ./build/check-runtime-config-compat.ts
+RUN bun ./build/transpile-runtime.ts
+RUN bun ./build/prepare-static-web.ts ./opencode/packages/app/dist
 RUN mkdir -p release/public release/runtime release/config \
  && cp -r config/. release/config/ \
  && cp dist/runtime/runtime-bundle.js release/runtime/ \

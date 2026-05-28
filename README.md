@@ -89,7 +89,7 @@ Requests with an unmatched `Host` header never receive a generated runtime confi
 
 ## How It Works
 
-1. **Build:** the Docker build compiles the upstream app, injects the runtime bootstrap into `index.html`, patches the built frontend to use `window.__OPENCODE_SERVER_URL`, and runs a compatibility check so upstream persistence changes fail early.
+1. **Build:** the Docker build compiles the upstream app, runs a compatibility check before assembling the release, injects the runtime bootstrap into `index.html`, and patches the built frontend to use `window.__OPENCODE_SERVER_URL`.
 2. **Runtime:** nginx's official entrypoint runs `/docker-entrypoint.d/40-opencode-web.sh`, which validates `SERVER_<N>_HOST` and `SERVER_<N>_BACKEND`, generates per-host runtime configs under `/opt/opencode-web/runtime-configs/<host>.js`, and writes `/etc/nginx/conf.d/default.conf` from `config/nginx.conf.template`.
 3. **Serving:** nginx serves shared static files from `/opt/opencode-web/public`. Configured hosts get exact server blocks, `/runtime-config.js` aliases the matching generated config, extension-like missing static files return `404`, route-like extensionless paths fall back to `/index.html`, and only `/assets/` uses immutable caching.
 
