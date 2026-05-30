@@ -268,8 +268,8 @@ export const staticCspContracts: Contract[] = [
 			),
 			match(
 				"runtimeGenerator",
-				/alias \/opt\/opencode-web\/runtime-configs\/\$host\.js;/,
-				"expected generated /runtime-config.js to alias the per-host runtime config",
+				/alias \$runtime_config_root\/\$host\.js;/,
+				"expected generated /runtime-config.js to alias the configured per-host runtime config root",
 			),
 			match(
 				"runtimeGenerator",

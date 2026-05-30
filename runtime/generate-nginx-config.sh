@@ -98,12 +98,12 @@ encode_base64() {
   printf '%s' "$1" | base64 | tr -d '\n'
 }
 
-runtime_root="/opt/opencode-web"
+runtime_root="${OPENCODE_WEB_RUNTIME_ROOT:-/opt/opencode-web}"
 public_root="$runtime_root/public"
 runtime_config_root="$runtime_root/runtime-configs"
 runtime_bundle_path="$runtime_root/runtime/runtime-bundle.js"
 nginx_template_path="$runtime_root/config/nginx.conf.template"
-nginx_config_path="/etc/nginx/conf.d/default.conf"
+nginx_config_path="${OPENCODE_WEB_NGINX_CONFIG_PATH:-/etc/nginx/conf.d/default.conf}"
 nginx_servers_marker="# OPENCODE_WEB_GENERATED_SERVERS"
 nginx_listen_port="8080"
 
@@ -220,7 +220,7 @@ server {
   listen $nginx_listen_port;
   listen [::]:$nginx_listen_port;
   server_name $host;
-  root /opt/opencode-web/public;
+  root $public_root;
   index index.html;
 $(write_no_store_headers)
 
@@ -230,7 +230,7 @@ $(write_no_store_headers)
   }
 
   location = /runtime-config.js {
-    alias /opt/opencode-web/runtime-configs/$host.js;
+    alias $runtime_config_root/$host.js;
   }
 
   location ^~ /assets/ {
