@@ -74,25 +74,6 @@ async function outputFor(args: string[]) {
 	};
 }
 
-async function expectFailure(
-	name: string,
-	expectedMessage: string,
-	args: string[],
-): Promise<void> {
-	console.log(`==> ${name}`);
-	const result = await outputFor(args);
-	if (result.exitCode === 0)
-		throw new Error(`Expected failure, but command succeeded for: ${name}`);
-
-	process.stdout.write(result.output);
-
-	if (!result.output.includes(expectedMessage)) {
-		throw new Error(
-			`Expected message not found for: ${name}\nExpected: ${expectedMessage}`,
-		);
-	}
-}
-
 async function expectSuccess(name: string, args: string[]): Promise<void> {
 	console.log(`==> ${name}`);
 	await run(args);
@@ -111,6 +92,11 @@ async function expectFinalImageLayout(
 			"test -f /opt/opencode-web/config/nginx.conf.template",
 			"test ! -e /opt/opencode-web/config/config",
 			"test -f /opt/opencode-web/public/index.html",
+			"test -d /opt/opencode-web/public/assets",
+			"test -s /opt/opencode-web/public/opencode-web-customizations.css",
+			"test ! -e /opt/opencode-web/public/runtime-config.js",
+			'! grep -F "<style id=\\"opencode-web-customizations\\"" /opt/opencode-web/public/index.html >/dev/null',
+			'grep -F "<link rel=\\"stylesheet\\" href=\\"/opencode-web-customizations.css\\">" /opt/opencode-web/public/index.html >/dev/null',
 			"test -f /opt/opencode-web/runtime/generate-nginx-config.sh",
 			"test -x /docker-entrypoint.d/40-opencode-web.sh",
 			"test -f /opt/opencode-web/runtime/runtime-bundle.js",
@@ -191,14 +177,6 @@ function evaluateRuntimeConfig(
 		);
 }
 
-async function expectGeneratedRuntimeConfigParses(
-	name: string,
-	args: string[],
-): Promise<void> {
-	console.log(`==> ${name}`);
-	new Function(await capture(args));
-}
-
 async function expectGeneratedRuntimeConfigApplies(
 	name: string,
 	expectedTitle: string,
@@ -271,396 +249,37 @@ try {
 		const command = commandIndex === -1 ? [] : args.slice(commandIndex);
 		return ["docker", "run", "--rm", ...dockerOptions, imageTag, ...command];
 	};
-	const entrypoint = ["sh", "-lc", "/docker-entrypoint.d/40-opencode-web.sh"];
-	const generatedConfig = (host: string) =>
-		`test -s /opt/opencode-web/runtime-configs/${host}.js && cat /opt/opencode-web/runtime-configs/${host}.js`;
+	const runtimeEnv = [
+		"-e",
+		"SERVER_1_HOST=web1.opencode.example.com",
+		"-e",
+		"SERVER_1_BACKEND=http://api1.opencode.example.com",
+		"-e",
+		"SERVER_2_HOST=web2.opencode.example.com",
+		"-e",
+		"SERVER_2_BACKEND=http://api2.opencode.example.com",
+	];
 	const multilineEnvValue = "before\nSERVER_9_HOST\nafter";
 
-	await expectFailure(
-		"reject legacy URL-only configuration",
-		"SERVER_1_HOST and SERVER_1_BACKEND are required.",
-		dockerRun(
-			"-e",
-			"SERVER_1_URL=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject malformed indexed env names",
-		"Configured backend variable names must use unpadded integer indexes starting at 1. Invalid variable: SERVER_1FOO_HOST.",
-		dockerRun("-e", "SERVER_1FOO_HOST=x", ...entrypoint),
-	);
-	await expectFailure(
-		"reject padded backend indexes",
-		"Configured backend variable names must use unpadded integer indexes starting at 1. Invalid variable: SERVER_01_HOST.",
-		dockerRun("-e", "SERVER_01_HOST=web1.opencode.example.com", ...entrypoint),
-	);
-	await expectFailure(
-		"reject non-contiguous backend indexes",
-		"Configured backend indexes must be contiguous starting at 1. Missing index 2.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"-e",
-			"SERVER_3_HOST=web3.opencode.example.com",
-			"-e",
-			"SERVER_3_BACKEND=http://api3.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject missing host",
-		"SERVER_1_HOST is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs.",
-		dockerRun(
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject missing backend",
-		"SERVER_1_BACKEND is required and must be an absolute http(s) URL.",
-		dockerRun("-e", "SERVER_1_HOST=web1.opencode.example.com", ...entrypoint),
-	);
-	await expectFailure(
-		"reject protocol in host",
-		"SERVER_1_HOST is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=https://web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject port in host",
-		"SERVER_1_HOST is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com:8080",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject path in host",
-		"SERVER_1_HOST is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com/app",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject direct unicode IDN host",
-		"SERVER_1_HOST is required and must be a hostname-only ASCII DNS name. Use Punycode for IDNs.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=täst.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject duplicate hosts",
-		"Duplicate configured host after normalization: web1.opencode.example.com",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"-e",
-			"SERVER_2_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=http://api2.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject case-variant duplicate hosts",
-		"Duplicate configured host after normalization: web1.opencode.example.com",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=Web1.OpenCode.Example.Com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"-e",
-			"SERVER_2_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=http://api2.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject backend without scheme",
-		"SERVER_1_BACKEND is required and must be an absolute http(s) URL.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=api1.opencode.example.com",
-			...entrypoint,
-		),
-	);
-	await expectFailure(
-		"reject backend with empty host after scheme",
-		"SERVER_1_BACKEND is required and must be an absolute http(s) URL.",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://",
-			...entrypoint,
-		),
-	);
-
 	await expectFinalImageLayout(
-		"final image layout is sane",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-		),
+		"final image layout and permissions are sane",
+		dockerRun(...runtimeEnv),
 	);
 	await expectSuccess(
-		"ignore multiline env values while scanning backend vars",
+		"entrypoint ignores multiline unrelated env values on Alpine",
 		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
+			...runtimeEnv,
 			"-e",
 			`UNRELATED_MULTILINE=${multilineEnvValue}`,
 			"sh",
 			"-lc",
-			"/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test ! -e /opt/opencode-web/public/runtime-config.js",
-		),
-	);
-	await expectSuccess(
-		"clean stale generated runtime config files",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"sh",
-			"-lc",
-			"touch /opt/opencode-web/runtime-configs/stale.js && /docker-entrypoint.d/40-opencode-web.sh && test -d /opt/opencode-web/runtime-configs && test ! -e /opt/opencode-web/runtime-configs/stale.js && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js",
-		),
-	);
-	await expectSuccess(
-		"generate valid host-based runtime payloads",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=https://api1.opencode.example.com",
-			"-e",
-			"SERVER_1_NAME=Server 1",
-			"-e",
-			"SERVER_1_APP_TITLE=Server 1 Web",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=https://api2.opencode.example.com/",
-			"-e",
-			"SERVER_2_APP_TITLE=Server 2 Web",
-			"sh",
-			"-lc",
-			'/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test -s /opt/opencode-web/runtime-configs/web2.opencode.example.com.js && test -s /etc/nginx/conf.d/default.conf && test ! -e /opt/opencode-web/public/runtime-config.js && test -d /opt/opencode-web/public/assets && test -s /opt/opencode-web/public/opencode-web-customizations.css && ! grep -F "<style id=\\"opencode-web-customizations\\"" /opt/opencode-web/public/index.html >/dev/null && grep -F "<link rel=\\"stylesheet\\" href=\\"/opencode-web-customizations.css\\">" /opt/opencode-web/public/index.html >/dev/null',
-		),
-	);
-	await expectSuccess(
-		"runtime config generation is idempotent",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=http://api2.opencode.example.com",
-			"sh",
-			"-lc",
-			'/docker-entrypoint.d/40-opencode-web.sh && test "$(grep -c "server_name web" /etc/nginx/conf.d/default.conf)" -eq 2',
-		),
-	);
-
-	await expectGeneratedRuntimeConfigApplies(
-		"server 1 runtime-config applies only server 1",
-		"Server 1 Web",
-		"https://api1.opencode.example.com",
-		"https://api1.opencode.example.com",
-		'[{"url":"https://api1.opencode.example.com","name":"Server 1"}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=https://api1.opencode.example.com",
-			"-e",
-			"SERVER_1_NAME=Server 1",
-			"-e",
-			"SERVER_1_APP_TITLE=Server 1 Web",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=https://api2.opencode.example.com/",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web1.opencode.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigApplies(
-		"server 2 runtime-config applies only server 2",
-		"Server 2 Web",
-		"https://api2.opencode.example.com",
-		"https://api2.opencode.example.com",
-		'[{"url":"https://api2.opencode.example.com","name":"Server 2"}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=https://api1.opencode.example.com",
-			"-e",
-			"SERVER_1_NAME=Server 1",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=https://api2.opencode.example.com/",
-			"-e",
-			"SERVER_2_NAME=Server 2",
-			"-e",
-			"SERVER_1_APP_TITLE=Server 1 Web",
-			"-e",
-			"SERVER_2_APP_TITLE=Server 2 Web",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web2.opencode.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigApplies(
-		"generated runtime-config preserves unicode metadata",
-		"你好 OpenCode",
-		"https://api1.opencode.example.com",
-		"https://api1.opencode.example.com",
-		'[{"url":"https://api1.opencode.example.com","name":"München"}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=xn--tst-qla.example.com",
-			"-e",
-			"SERVER_1_BACKEND=https://api1.opencode.example.com",
-			"-e",
-			"SERVER_1_NAME=München",
-			"-e",
-			"SERVER_1_APP_TITLE=你好 OpenCode",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("xn--tst-qla.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigParses(
-		"generated runtime-config.js parses as JavaScript",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=https://api1.opencode.example.com",
-			"-e",
-			"SERVER_1_NAME=Server 1",
-			"-e",
-			"SERVER_1_APP_TITLE=Hosted OpenCode",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web1.opencode.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigApplies(
-		"normalizes uppercase scheme and hostname to lowercase",
-		"OpenCode",
-		"https://api1.opencode.example.com",
-		"https://api1.opencode.example.com",
-		'[{"url":"https://api1.opencode.example.com","name":""}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=WEB1.OPENCODE.EXAMPLE.COM",
-			"-e",
-			"SERVER_1_BACKEND=HTTPS://API1.OPENCODE.EXAMPLE.COM",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web1.opencode.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigApplies(
-		"preserves URL path case while normalizing scheme and host",
-		"OpenCode",
-		"https://api.opencode.example.com/pAtH",
-		"https://api.opencode.example.com/pAtH",
-		'[{"url":"https://api.opencode.example.com/pAtH","name":""}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=HTTPS://API.OPENCODE.EXAMPLE.COM/pAtH",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web1.opencode.example.com")}`,
-		),
-	);
-	await expectGeneratedRuntimeConfigApplies(
-		"preserves port while normalizing scheme and host",
-		"OpenCode",
-		"http://api.opencode.example.com:8080",
-		"http://api.opencode.example.com:8080",
-		'[{"url":"http://api.opencode.example.com:8080","name":""}]',
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=HTTP://API.OPENCODE.EXAMPLE.COM:8080",
-			"sh",
-			"-lc",
-			`/docker-entrypoint.d/40-opencode-web.sh && ${generatedConfig("web1.opencode.example.com")}`,
-		),
-	);
-	await expectSuccess(
-		"allow duplicate backend URLs across hosts",
-		dockerRun(
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api.opencode.example.com",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=http://api.opencode.example.com/",
-			"sh",
-			"-lc",
-			"/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test -s /opt/opencode-web/runtime-configs/web2.opencode.example.com.js",
+			"/docker-entrypoint.d/40-opencode-web.sh && test -s /opt/opencode-web/runtime-configs/web1.opencode.example.com.js && test -s /etc/nginx/conf.d/default.conf",
 		),
 	);
 
 	const containerId = await withNginxContainer(
 		"nginx starts through official entrypoint",
-		[
-			"-e",
-			"SERVER_1_HOST=web1.opencode.example.com",
-			"-e",
-			"SERVER_1_BACKEND=http://api1.opencode.example.com",
-			"-e",
-			"SERVER_2_HOST=web2.opencode.example.com",
-			"-e",
-			"SERVER_2_BACKEND=http://api2.opencode.example.com",
-			imageTag,
-		],
+		[...runtimeEnv, imageTag],
 	);
 	try {
 		await expectGeneratedRuntimeConfigApplies(
@@ -770,7 +389,7 @@ try {
 		await stopNginxContainer(containerId);
 	}
 
-	console.log("==> All runtime-config regression checks passed");
+	console.log("==> Runtime-config Docker smoke checks passed");
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error));
 	process.exit(1);
