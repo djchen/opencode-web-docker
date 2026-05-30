@@ -1,4 +1,5 @@
 import { entrySourcePath } from "./runtime-config.contracts";
+import { patchEntrySource } from "../build/patch-upstream-app-source";
 import { every, match } from "./core";
 import type { Contract } from "./core";
 
@@ -22,24 +23,23 @@ export const prepareStaticWebSources: Record<string, string> = {
 
 export const prepareStaticWebContracts: Contract[] = [
 	{
-		area: "server URL JS patch",
-		hint: "If getCurrentUrl() logic changed, update the JS patch in build/prepare-static-web.ts and the contract; if only regex patterns shifted, update the contract.",
+		area: "server URL source patch",
+		hint: "If getCurrentUrl() logic changed, update build/patch-upstream-app-source.ts and this contract; if only regex patterns shifted, update the contract.",
 		checks: [
-			match(
-				"entry",
-				/(?:window\.)?location\.hostname\.includes\("opencode\.ai"\)/,
-				"expected app getCurrentUrl to keep the opencode.ai hostname check (used by prepare-static-web.ts JS patch)",
-			),
-			match(
-				"entry",
-				/return "http:\/\/localhost:4096"/,
-				"expected app getCurrentUrl to keep returning the localhost bootstrap URL literal (used by prepare-static-web.ts JS patch)",
-			),
-			match(
-				"entry",
-				/return (?:window\.)?location\.origin/,
-				"expected app getCurrentUrl to keep returning location.origin as fallback (used by prepare-static-web.ts JS patch)",
-			),
+			{
+				file: "entry",
+				message:
+					"expected app getCurrentUrl source to remain patchable by build/patch-upstream-app-source.ts",
+				test: (files) => {
+					try {
+						return patchEntrySource(files.entry!).includes(
+							"window.__OPENCODE_SERVER_URL || location.origin",
+						);
+					} catch {
+						return false;
+					}
+				},
+			},
 		],
 	},
 	{
