@@ -20,7 +20,9 @@ COPY --parents \
 RUN bun install --cwd opencode --filter @opencode-ai/app --frozen-lockfile --ignore-scripts
 
 COPY opencode ./opencode
-# Keep wrapper-only edits from invalidating the upstream app build layer.
+COPY build/patch-upstream-app-source.ts ./build/
+RUN bun ./build/patch-upstream-app-source.ts ./opencode/packages/app/src
+# Keep most wrapper-only edits from invalidating the upstream app build layer.
 RUN OPENCODE_CHANNEL=prod bun run --cwd opencode/packages/app build -- --sourcemap false
 COPY build ./build/
 COPY runtime ./runtime/
