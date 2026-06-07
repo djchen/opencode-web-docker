@@ -1,3 +1,7 @@
+# Archived
+
+This project has been archived in favor of using [OpenChamber](https://github.com/openchamber/openchamber). It is far less buggy and has many more features than the stock OpenCode web/desktop interface.
+
 # OpenCode Web Docker
 
 Self-host the [OpenCode](https://opencode.ai) web frontend as a static site with host-based runtime configuration injection for one or more `opencode serve` backends.
